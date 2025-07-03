@@ -20,7 +20,7 @@ const mint = generateSigner(umi);
         mint,
         name: "Logan Rug",
         symbol: "LOGRUG",
-        uri: "https://devnet.irys.xyz/FYa891o4UZffRCXaPieUABUWBWdauPdhJ4aDfSJe94uR",
+        uri: "https://devnet.irys.xyz/DCgviiLmH27hqCAqKu5USCyM7h2shHz9pkgMRLT95KL5",
         sellerFeeBasisPoints: percentAmount(5),
     })
     let result = await tx.sendAndConfirm(umi);
@@ -29,8 +29,8 @@ const mint = generateSigner(umi);
     console.log(`Succesfully Minted! Check out your TX here:\nhttps://explorer.solana.com/tx/${signature}?cluster=devnet`)
     /*
     Succesfully Minted! Check out your TX here:
-    https://explorer.solana.com/tx/3HfWVUBLpoPD3TSwT6pXEwfNLEKrZSi9qpJFLe9hH4FdumwKyTSZmSJFr227PffEmGyiAW4y5wiXRiSA1vZQpMKS?cluster=devnet
-    Mint Address:  1q4S5feSENuyBvvDpuyGnL8chMHBZNEX4G4iQM2rRQm
+    https://explorer.solana.com/tx/3g7ErVEtMsCrgkMcTyt97q5j4XZXgeKpfo6WSvE3UYP9GfzzZ9zWWKVbeSWp7TL5ZNDwez1bzHs12UJbgFLvaKKE?cluster=devnet
+    Mint Address:  8UUg1Ve58Vv8v38KpnmQtkeZa1d9dBti2TQGavA9QfvQ
     */
 
     console.log("Mint Address: ", mint.publicKey);
