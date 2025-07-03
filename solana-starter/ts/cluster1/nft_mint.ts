@@ -27,6 +27,11 @@ const mint = generateSigner(umi);
     const signature = base58.encode(result.signature);
     
     console.log(`Succesfully Minted! Check out your TX here:\nhttps://explorer.solana.com/tx/${signature}?cluster=devnet`)
+    /*
+    Succesfully Minted! Check out your TX here:
+    https://explorer.solana.com/tx/3HfWVUBLpoPD3TSwT6pXEwfNLEKrZSi9qpJFLe9hH4FdumwKyTSZmSJFr227PffEmGyiAW4y5wiXRiSA1vZQpMKS?cluster=devnet
+    Mint Address:  1q4S5feSENuyBvvDpuyGnL8chMHBZNEX4G4iQM2rRQm
+    */
 
     console.log("Mint Address: ", mint.publicKey);
 })();
