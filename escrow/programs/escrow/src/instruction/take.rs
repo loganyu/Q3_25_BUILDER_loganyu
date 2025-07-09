@@ -7,14 +7,16 @@ use anchor_spl::{
 
 #[derive(Accounts)]
 #[instruction(seed: u64)]
-pub struct Make<'info> {
+pub struct Take<'info> {
   #[account(mut)]
   pub taker: Signer<'info>,
   #[account(
     mint::token_program = token_program,
   )]
   pub maker: SystemAccount<'info>,
-  #[account(mut)]
+  #[account(
+    mint::token_program = token_program,
+  )]
   pub mint_a: InterfaceAccount<'info, Mint>,
   #[account(
     mint::token_program = token_program,
@@ -22,14 +24,14 @@ pub struct Make<'info> {
   pub mint_b: InterfaceAccount<'info, Mint>,
   #[account(
     init_if_needed,
-    payer = take,
+    payer = taker,
     associated_token::mint = mint_b,
     associated_token::authority = maker,
     associated_token::token_program = token_program,
   )]
   pub maker_ata_b: InterfaceAccount<'info, TokenAccount>,
   #[account(
-    mut,
+    init_if_needed,
     associated_token::mint = mint_b,
     associated_token::authority = taker,
     associated_token::token_program = token_program,
