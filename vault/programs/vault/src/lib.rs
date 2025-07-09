@@ -1,4 +1,5 @@
 #![allow(unexpected_cfgs)]
+#![allow(deprecated)]
 
 use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
 
@@ -122,7 +123,7 @@ impl<'info> Withdraw<'info> {
         };
 
         let pda_signing_seeds = [
-            b"vault",
+            b"vault".as_ref(),
             self.vault_state.to_account_info().key.as_ref(),
             &[self.vault_state.vault_bump],
         ];
