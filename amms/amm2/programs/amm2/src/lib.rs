@@ -1,4 +1,13 @@
+#![allow(unexpected_cfgs, deprecated)]
+
 use anchor_lang::prelude::*;
+
+mod instructions;
+mod state;
+
+use instructions::*;
+use state::*;
+
 
 declare_id!("E7F9bT8pUiuG8nkfF3KQqeTe6czCRGd7ES4xMPeGv396");
 
@@ -11,6 +20,3 @@ pub mod amm2 {
         Ok(())
     }
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}
