@@ -1,20 +1,28 @@
 {
-  "license": "ISC",
+  "name": "escrow",
+  "version": "2.0.0",
   "scripts": {
+    "build": "anchor build",
+    "test": "anchor test",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "show-versions": "bash show-versions.sh",
+    "regenerate-client": "anchor build && npx tsx create-codama-client.ts"
   },
-  "dependencies": {
-    "@coral-xyz/anchor": "^0.31.1"
-  },
+  "license": "MIT",
   "devDependencies": {
-    "chai": "^4.3.4",
-    "mocha": "^9.0.3",
-    "ts-mocha": "^10.0.0",
-    "@types/bn.js": "^5.1.0",
-    "@types/chai": "^4.3.0",
-    "@types/mocha": "^9.0.0",
-    "typescript": "^5.7.3",
-    "prettier": "^2.6.2"
+    "@codama/nodes-from-anchor": "^1.2.0",
+    "@codama/renderers": "^1.0.23",
+    "@types/node": "^22.13.5",
+    "codama": "^1.3.0",
+    "prettier": "^3.4.2",
+    "solana-kite": "^1.2.5",
+    "tsx": "^4.19.3",
+    "cli-confetti": "^1.1.1",
+    "cli-update": "^3.2.8",
+    "typescript": "^5.8.2"
+  },
+  "type": "module",
+  "dependencies": {
   }
 }
