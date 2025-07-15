@@ -69,7 +69,7 @@ pub struct Take<'info> {
 }
 
 impl<'info> Take<'info> {
-    pub fn deposit(&mut self, deposit: u64) -> Result<()> {
+    pub fn deposit(&mut self) -> Result<()> {
         let transfer_accounts = TransferChecked {
             from: self.taker_ata_b.to_account_info(),
             mint: self.mint_b.to_account_info(),
@@ -82,7 +82,7 @@ impl<'info> Take<'info> {
             transfer_accounts,
         );
 
-        transfer_checked(cpi_ctx, deposit, self.mint_b.decimals)?;
+        transfer_checked(cpi_ctx, self.escrow.receive, self.mint_b.decimals)?;
 
         Ok(())
     }

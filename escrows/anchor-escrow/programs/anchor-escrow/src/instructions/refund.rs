@@ -47,7 +47,7 @@ pub struct Refund<'info> {
 }
 
 impl<'info> Refund<'info> {
-  pub fn refund_and_close(&mut self, deposit: u64) -> Result<()> {
+  pub fn refund_and_close(&mut self) -> Result<()> {
     let signer_seeds: [&[&[u8]]; 1] = [&[
       b"escrow",
       self.maker.to_account_info().key.as_ref(),
@@ -67,7 +67,7 @@ impl<'info> Refund<'info> {
       transfer_accounts,
     );
 
-    transfer_checked(cpi_ctx, deposit, self.mint_a.decimals)?;
+    transfer_checked(cpi_ctx, self.escrow.receive, self.mint_a.decimals)?;
 
     let close_accounts = CloseAccount {
       account: self.vault.to_account_info(),
