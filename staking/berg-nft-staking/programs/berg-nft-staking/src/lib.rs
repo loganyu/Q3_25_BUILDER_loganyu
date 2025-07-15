@@ -1,4 +1,11 @@
+#![allow(unexpected_cfgs, deprecated)]
 use anchor_lang::prelude::*;
+
+pub mod instructions;
+pub mod state;
+
+use instructions::*;
+use state::*;
 
 declare_id!("D3iKQB5m1YuZZJkqbK89dBfv57kp1x3tB27nhn4fbXtu");
 
