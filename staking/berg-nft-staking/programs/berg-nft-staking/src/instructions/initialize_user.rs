@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use anchor_spl::token::{Mint, Token};
 
-use crate::state::UserAccount;
+use crate::state::{UserAccount, StakeConfig};
 
 #[derive(Accounts)]
 pub struct InitializeUser<'info> {
@@ -16,16 +16,16 @@ pub struct InitializeUser<'info> {
     bump,
     space = 8 + StakeConfig::INIT_SPACE,
   )]
-  pub user_account: Account<'info, StakeConfig>,
+  pub user_account: Account<'info, UserAccount>,
 
   pub system_program: Program<'info, System>,
 }
 
 
-impl<'info> InitializeConfig<'info> {
+impl<'info> InitializeUser<'info> {
 
   pub fn initialize_user(&mut self, bumps: InitializeUserBumps) -> Result<()> {
-    self.config.set_inner(UserAccount { 
+    self.user_account.set_inner(UserAccount { 
       points: 0,
       amount_staked: 0,
       bump: bumps.user_account, 
