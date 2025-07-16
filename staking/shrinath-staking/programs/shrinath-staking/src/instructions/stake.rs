@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{StakeAccount, StateConfig, UserAccount};
+use crate::state::{StakeAccount, StakeConfig, UserAccount};
 
 #[derive(Accounts)]
 pub struct Stake<'info> {
@@ -24,10 +24,11 @@ pub struct Stake<'info> {
       b"metadata",
       metadata_program.key().as_ref(),
       mint.key().as_ref(),
-      seeds::program = metadata_program.key(),
-      bump,
-      constraint = metadata.collection.as_ref().unwrap().key(),
-    ]
+    ],
+    seeds::program = metadata_program.key(),
+    bump,
+    constraint = metadata.collection.as_ref().unwrap().key.as_ref() == collection_mint.key().as_ref(),
+    constraint = metadata.collection.as_ref().unwrap().verified == true
   )]
   pub metadata: Account<'info, MetadataAccount>,
 
