@@ -11,7 +11,7 @@ describe("vault", () => {
 
   const program = anchor.workspace.vault as Program<Vault>;
   const connection = provider.connection;
-  const user = provider.publicKey;
+  const signer = provider.publicKey;
 
   const vaultStatePda = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("state"), provider.publicKey.toBytes()], program.programId
@@ -23,9 +23,9 @@ describe("vault", () => {
   it("Is initialized!", async () => {
     const tx = await program.methods.initialize()
     .accountsPartial({
-      user,
-      vaultStatePda,
-      vaultPda,
+      signer,
+      vaultState: vaultStatePda,
+      vault: vaultPda,
       systemProgram: anchor.web3.SystemProgram.programId,
     })
     .rpc();
@@ -43,7 +43,7 @@ describe("vault", () => {
     await program.methods
       .deposit(amount)
       .accountsPartial({
-        signer: user,
+        signer,
         vaultState: vaultStatePda,
         vault: vaultPda,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -62,7 +62,7 @@ describe("vault", () => {
     await program.methods
       .withdraw(amount)
       .accountsPartial({
-        signer: user,
+        signer,
         vaultState: vaultStatePda,
         vault: vaultPda,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -83,7 +83,7 @@ describe("vault", () => {
       await program.methods
         .close()
         .accountsPartial({
-          signer: user,
+          signer,
           vaultState: vaultStatePda,
           vault: vaultPda,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -96,7 +96,7 @@ describe("vault", () => {
       const vaultStateAccount = await connection.getAccountInfo(vaultStatePda);
       assert.isNull(vaultStateAccount, "vault_state account should be closed");
 
-      const afterUser = await connection.getBalance(user);
+      const afterUser = await connection.getBalance(signer);
       assert.isAtLeast(afterUser, beforeUser + remaining - 5_000, "user should receive the leftover vault balance");
     });
 
