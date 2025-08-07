@@ -81,7 +81,7 @@ impl<'info> InitializeUser<'info> {
 
 // Create Position
 #[derive(Accounts)]
-#[instruction(position_id: u64)]
+#[instruction(position_id: u64, lp_range_min: u64, lp_range_max: u64)]
 pub struct CreatePosition<'info> {
     #[account(
         init,
@@ -90,7 +90,7 @@ pub struct CreatePosition<'info> {
         seeds = [POSITION_SEED, owner.key().as_ref(), position_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub position: Account<'info, Position>,
+    pub position: Box<Account<'info, Position>>,
     
     #[account(
         mut,
@@ -98,14 +98,14 @@ pub struct CreatePosition<'info> {
         bump = user_main_account.bump,
         constraint = user_main_account.owner == owner.key()
     )]
-    pub user_main_account: Account<'info, UserMainAccount>,
+    pub user_main_account: Box<Account<'info, UserMainAccount>>,
     
     #[account(
         mut,
         seeds = [PROTOCOL_SEED],
         bump = protocol_authority.bump
     )]
-    pub protocol_authority: Account<'info, ProtocolAuthority>,
+    pub protocol_authority: Box<Account<'info, ProtocolAuthority>>, 
     
     pub token_a_mint: Account<'info, Mint>,
     pub token_b_mint: Account<'info, Mint>,
@@ -116,7 +116,7 @@ pub struct CreatePosition<'info> {
         associated_token::mint = token_a_mint,
         associated_token::authority = position
     )]
-    pub position_token_a_vault: Account<'info, TokenAccount>,
+    pub position_token_a_vault: Box<Account<'info, TokenAccount>>, 
     
     #[account(
         init,
@@ -124,7 +124,7 @@ pub struct CreatePosition<'info> {
         associated_token::mint = token_b_mint,
         associated_token::authority = position
     )]
-    pub position_token_b_vault: Account<'info, TokenAccount>,
+    pub position_token_b_vault: Box<Account<'info, TokenAccount>>,
     
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -202,49 +202,49 @@ pub struct DepositToPosition<'info> {
         seeds = [PROTOCOL_SEED],
         bump = protocol_authority.bump
     )]
-    pub protocol_authority: Account<'info, ProtocolAuthority>,
+    pub protocol_authority: Box<Account<'info, ProtocolAuthority>>, 
     
     #[account(
         mut,
         constraint = user_token_a.owner == owner.key(),
         constraint = user_token_a.mint == position.token_a_mint
     )]
-    pub user_token_a: Account<'info, TokenAccount>,
+    pub user_token_a: Box<Account<'info, TokenAccount>>,
     
     #[account(
         mut,
         constraint = user_token_b.owner == owner.key(),
         constraint = user_token_b.mint == position.token_b_mint
     )]
-    pub user_token_b: Account<'info, TokenAccount>,
+    pub user_token_b: Box<Account<'info, TokenAccount>>,
     
     #[account(
         mut,
         associated_token::mint = token_a_mint,
         associated_token::authority = position
     )]
-    pub position_token_a_vault: Account<'info, TokenAccount>,
+    pub position_token_a_vault: Box<Account<'info, TokenAccount>>,
     
     #[account(
         mut,
         associated_token::mint = token_b_mint,
         associated_token::authority = position
     )]
-    pub position_token_b_vault: Account<'info, TokenAccount>,
+    pub position_token_b_vault: Box<Account<'info, TokenAccount>>, 
     
     #[account(
         mut,
         constraint = fee_token_a.owner == protocol_authority.fee_recipient,
         constraint = fee_token_a.mint == position.token_a_mint
     )]
-    pub fee_token_a: Account<'info, TokenAccount>,
+    pub fee_token_a: Box<Account<'info, TokenAccount>>,
     
     #[account(
         mut,
         constraint = fee_token_b.owner == protocol_authority.fee_recipient,
         constraint = fee_token_b.mint == position.token_b_mint
     )]
-    pub fee_token_b: Account<'info, TokenAccount>,
+    pub fee_token_b: Box<Account<'info, TokenAccount>>,
     
     pub owner: Signer<'info>,
     pub token_a_mint: Account<'info, Mint>,
@@ -366,7 +366,7 @@ pub struct ModifyPosition<'info> {
         bump = position.bump,
         has_one = owner
     )]
-    pub position: Account<'info, Position>,
+    pub position: Box<Account<'info, Position>>, 
     
     pub owner: Signer<'info>,
 }
