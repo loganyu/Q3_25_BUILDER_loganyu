@@ -8,6 +8,9 @@ skip-lint = false
 [programs.localnet]
 capital_reallocator = "6MfEgfgcnoGujn36FJCNoKecu7vCzXVX1K7Hu4qQdTKB"
 
+[programs.devnet]
+capital_reallocator = "6MfEgfgcnoGujn36FJCNoKecu7vCzXVX1K7Hu4qQdTKB"
+
 [registry]
 url = "https://api.apr.dev"
 

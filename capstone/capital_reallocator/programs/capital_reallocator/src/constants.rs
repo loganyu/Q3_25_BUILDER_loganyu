@@ -1,3 +1,4 @@
+// constants.rs
 pub const PROTOCOL_SEED: &[u8] = b"protocol";
 pub const USER_SEED: &[u8] = b"user";
 pub const POSITION_SEED: &[u8] = b"position";
