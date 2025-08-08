@@ -9,9 +9,9 @@
     "deploy:local": "anchor deploy",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
     "test": "anchor test",
+    
     "validator": "solana-test-validator --reset --quiet",
-    "config:local": "solana config set --url localhost",
-    "config:devnet": "solana config set --url devnet",
+    
     "setup": "npx ts-node scripts/utils/setup.ts",
     "init-protocol": "npx ts-node scripts/utils/init-protocol.ts",
     "init-user": "npx ts-node scripts/utils/init-user.ts",
@@ -20,12 +20,7 @@
     "withdraw": "npx ts-node scripts/utils/withdraw.ts",
     "balances": "npx ts-node scripts/utils/check-balances.ts",
     "close-position": "npx ts-node scripts/utils/close-position.ts",
-    "local:setup": "yarn config:local && yarn setup",
-    "local:full": "yarn config:local && yarn setup && yarn init-protocol && yarn init-user && yarn create-position",
-    "devnet:setup": "yarn config:devnet && yarn setup",
-    "devnet:full": "yarn config:devnet && yarn setup && yarn init-protocol && yarn init-user && yarn create-position",
-    "airdrop": "solana airdrop 2",
-    "balance:sol": "solana balance",
+    
     "clean": "rm -f scripts/state.json && anchor clean"
   },
   "dependencies": {
