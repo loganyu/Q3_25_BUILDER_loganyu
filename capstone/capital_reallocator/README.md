@@ -106,7 +106,7 @@ yarn init-user
 yarn create-position
 
 # Test deposits
-yarn deposit 1000 5  # 1000 Token A, 5 Token B
+yarn deposit 10 1  # 10 Token A, 1 Token B
 
 # Check balances
 yarn balances
