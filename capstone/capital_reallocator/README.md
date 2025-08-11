@@ -74,7 +74,7 @@ Visit the Circle faucet as instructed in the setup output:
 
 ### Solana CLI Configuration
 
-## 🏠 Local Testing
+## Local Testing
 
 ### Step 1: Start Local Validator
 ```bash
@@ -91,7 +91,8 @@ solana-test-validator --reset --quiet
 anchor deploy
 ```
 
-### Step 3: Interactive Testing
+## Interactive Testing
+
 ```bash
 # Setup test environment (creates test tokens)
 yarn setup
@@ -122,7 +123,7 @@ yarn close-position
 yarn clean
 ```
 
-## 🎮 Interactive Testing Workflow
+## Interactive Testing Workflow
 
 ### Available Commands
 
@@ -147,7 +148,7 @@ yarn clean
 
 ```bash
 # Check account balances
-dotenv -e .env.local -- yarn balances
+yarn balances
 
 # View SOL balance
 solana balance

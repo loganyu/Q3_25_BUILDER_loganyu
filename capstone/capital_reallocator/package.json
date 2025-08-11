@@ -9,9 +9,7 @@
     "deploy:local": "anchor deploy",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
     "test": "anchor test",
-    
     "validator": "solana-test-validator --reset --quiet",
-    
     "setup": "npx ts-node scripts/utils/setup.ts",
     "init-protocol": "npx ts-node scripts/utils/init-protocol.ts",
     "init-user": "npx ts-node scripts/utils/init-user.ts",
@@ -20,13 +18,16 @@
     "withdraw": "npx ts-node scripts/utils/withdraw.ts",
     "balances": "npx ts-node scripts/utils/check-balances.ts",
     "close-position": "npx ts-node scripts/utils/close-position.ts",
-    
+    "pyth-devnet": "npx ts-node scripts/utils/pyth-devnet.ts",
     "clean": "rm -f scripts/state.json && anchor clean"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
+    "@pythnetwork/hermes-client": "^2.0.0",
+    "@pythnetwork/pyth-solana-receiver": "^0.10.2",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.95.2",
+    "axios": "^1.11.0",
     "bn.js": "^5.2.1",
     "dotenv": "^17.2.1"
   },

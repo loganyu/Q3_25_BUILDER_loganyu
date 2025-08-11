@@ -9,6 +9,11 @@ import { loadState, loadUserKeypair } from './setup';
 
 async function createPosition() {
   console.log('📊 Creating position...');
+
+  // Get command line arguments or use defaults
+  const args = process.argv.slice(2);
+  const rangeMinUSD = args[0] ? parseInt(args[0]) : 170; // Default: 170
+  const rangeMaxUSD = args[1] ? parseInt(args[1]) : 180;    // Default: 180
   
   // Load state and setup
   const state = loadState();
@@ -20,11 +25,11 @@ async function createPosition() {
   
   // Position parameters
   const positionId = new BN(1);
-  const lpRangeMin = new BN(100 * 10**6); // $100
-  const lpRangeMax = new BN(200 * 10**6); // $200
+  const lpRangeMin = new BN(rangeMinUSD * 10**6); // $100
+  const lpRangeMax = new BN(rangeMaxUSD * 10**6); // $200
   
   console.log('🔢 Position ID:', positionId.toString());
-  console.log('📈 LP Range: $100 - $200');
+  console.log(`📈 LP Range: $${rangeMinUSD}-$${rangeMaxUSD}`);
   
   // Derive position PDA
   const [position] = PublicKey.findProgramAddressSync(
