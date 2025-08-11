@@ -11,7 +11,7 @@ use crate::constants::*;
 #[derive(Accounts)]
 pub struct InitializeProtocol<'info> {
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         space = 8 + ProtocolAuthority::INIT_SPACE,
         seeds = [PROTOCOL_SEED],
@@ -52,7 +52,7 @@ impl<'info> InitializeProtocol<'info> {
 #[derive(Accounts)]
 pub struct InitializeUser<'info> {
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         space = 8 + UserMainAccount::INIT_SPACE,
         seeds = [USER_SEED, owner.key().as_ref()],
@@ -112,7 +112,7 @@ pub struct CreatePosition<'info> {
     pub token_b_mint: Account<'info, Mint>,
     
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         associated_token::mint = token_a_mint,
         associated_token::authority = position
@@ -120,7 +120,7 @@ pub struct CreatePosition<'info> {
     pub position_token_a_vault: Box<Account<'info, TokenAccount>>, 
     
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         associated_token::mint = token_b_mint,
         associated_token::authority = position
@@ -158,19 +158,32 @@ impl<'info> CreatePosition<'info> {
             position_id,
             token_a_mint: self.token_a_mint.key(),
             token_b_mint: self.token_b_mint.key(),
+            
+            // Token balances in different locations
             token_a_vault_balance: 0,
             token_b_vault_balance: 0,
             token_a_in_lp: 0,
             token_b_in_lp: 0,
             token_a_in_lending: 0,
             token_b_in_lending: 0,
+            
+            // LP range configuration
             lp_range_min,
             lp_range_max,
+            
+            // Position state
+            pause_flag: false,
+            created_at: Clock::get()?.unix_timestamp,
+            
+            // Rebalancing tracking
             last_rebalance_price: 0,
             last_rebalance_slot: 0,
             total_rebalances: 0,
-            pause_flag: false,
-            created_at: Clock::get()?.unix_timestamp,
+            
+            // External protocol position tracking (initially None)
+            meteora_position: None,
+            kamino_obligation: None,
+            
             bump: bumps.position,
         });
         

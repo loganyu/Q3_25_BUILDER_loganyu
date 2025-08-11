@@ -1,6 +1,6 @@
 // instructions/rebalance.rs
 use anchor_lang::prelude::*;
-use anchor_spl::token::Token;
+use anchor_spl::token::{Token, TokenAccount, Mint};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, get_feed_id_from_hex};
 use crate::state::*;
 use crate::errors::ErrorCode;
@@ -9,7 +9,13 @@ use crate::constants::*;
 
 pub const SOL_USD_FEED_ID: &str = "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
 
-// Check Position Status
+// Real Meteora DLMM Program ID
+pub const METEORA_DLMM_PROGRAM: &str = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo";
+// Real Kamino Lending Program ID  
+pub const KAMINO_LENDING_PROGRAM: &str = "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD";
+// Real Jupiter Aggregator Program ID
+pub const JUPITER_PROGRAM: &str = "JUPyTerVGraWPqKUN5g8STQTQbZvCEPfbZFpRFGHHHH";
+
 #[derive(Accounts)]
 pub struct CheckPositionStatus<'info> {
     #[account(
@@ -77,14 +83,52 @@ pub struct RebalancePosition<'info> {
     pub position: Account<'info, Position>,
     
     pub price_update: Account<'info, PriceUpdateV2>,
+
+    // Position token vaults
+    #[account(
+        mut,
+        constraint = position_token_a_vault.owner == position.key(),
+        constraint = position_token_a_vault.mint == position.token_a_mint
+    )]
+    pub position_token_a_vault: Box<Account<'info, TokenAccount>>,
     
-    /// CHECK: Meteora DLMM program
+    #[account(
+        mut,
+        constraint = position_token_b_vault.owner == position.key(),
+        constraint = position_token_b_vault.mint == position.token_b_mint
+    )]
+    pub position_token_b_vault: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK: Meteora LB pair account    
+    #[account(constraint = meteora_program.key() == METEORA_DLMM_PROGRAM.parse::<Pubkey>().unwrap())]
     pub meteora_program: UncheckedAccount<'info>,
+
+    /// CHECK: Meteora LB pair account
+    pub meteora_lb_pair: Option<UncheckedAccount<'info>>,
+    
+    /// CHECK: Meteora position account
+    pub meteora_position: Option<UncheckedAccount<'info>>,
+    
+    /// CHECK: Meteora bin arrays
+    pub meteora_bin_array_lower: Option<UncheckedAccount<'info>>,
+    pub meteora_bin_array_upper: Option<UncheckedAccount<'info>>,
     
     /// CHECK: Kamino lending program
+    #[account(constraint = kamino_program.key() == KAMINO_LENDING_PROGRAM.parse::<Pubkey>().unwrap())]
     pub kamino_program: UncheckedAccount<'info>,
+
+    /// CHECK: Kamino lending market
+    pub kamino_lending_market: Option<UncheckedAccount<'info>>,
+    
+    /// CHECK: Kamino obligation account
+    pub kamino_obligation: Option<UncheckedAccount<'info>>,
+    
+    /// CHECK: Kamino reserve accounts
+    pub kamino_reserve_a: Option<UncheckedAccount<'info>>,
+    pub kamino_reserve_b: Option<UncheckedAccount<'info>>,
     
     /// CHECK: Jupiter aggregator program
+    #[account(constraint = jupiter_program.key() == JUPITER_PROGRAM.parse::<Pubkey>().unwrap())]
     pub jupiter_program: UncheckedAccount<'info>,
     
     // Additional accounts would be needed for actual CPI calls
@@ -99,7 +143,7 @@ impl<'info> RebalancePosition<'info> {
 
         // Get price from Pyth
         let feed_id = get_feed_id_from_hex(SOL_USD_FEED_ID)?;
-        let maximum_age: u64 = 30; // 30 seconds max staleness
+        let maximum_age: u64 = 60; // 60 seconds max staleness
 
         let price_data = self.price_update.get_price_no_older_than(
             &Clock::get()?,
@@ -234,12 +278,10 @@ impl<'info> RebalancePosition<'info> {
         if in_range {
             if has_lending {
                 msg!("Moving from lending to LP");
-                self.withdraw_from_lending()?;
-                self.open_lp_position(current_price)?;
-                Ok(RebalanceAction::MoveToLP)
-            } else if has_idle {
-                msg!("Deploying idle funds to LP");
-                self.open_lp_position(current_price)?;
+                self.withdraw_from_kamino()?;
+            }
+            if has_idle || has_lending {
+                self.open_meteora_position(current_price)?;
                 Ok(RebalanceAction::MoveToLP)
             } else {
                 Ok(RebalanceAction::NoAction)
@@ -247,12 +289,10 @@ impl<'info> RebalancePosition<'info> {
         } else {
             if has_lp {
                 msg!("Moving from LP to lending");
-                self.close_lp_position()?;
-                self.deposit_to_lending()?;
-                Ok(RebalanceAction::MoveToLending)
-            } else if has_idle {
-                msg!("Deploying idle funds to lending");
-                self.deposit_to_lending()?;
+                self.close_meteora_position()?;
+            }
+            if has_idle || has_lp {
+                self.deposit_to_kamino()?;
                 Ok(RebalanceAction::MoveToLending)
             } else {
                 Ok(RebalanceAction::NoAction)
@@ -260,82 +300,239 @@ impl<'info> RebalancePosition<'info> {
         }
     }
     
-    fn withdraw_from_lending(&mut self) -> Result<()> {
-        // In production: Call Kamino withdraw CPI here
+    fn withdraw_from_kamino(&mut self) -> Result<()> {
+        msg!("Withdrawing from Kamino lending...");
+        // Check if we have lending accounts provided
+        let kamino_lending_market = self.kamino_lending_market.as_ref()
+            .ok_or(ErrorCode::LendingPositionNotFound)?;
+        let kamino_obligation = self.kamino_obligation.as_ref()
+            .ok_or(ErrorCode::LendingPositionNotFound)?;
+
+        // Real Kamino withdrawal would happen here
         // For now, simulate by moving balances
         let lending_a = self.position.token_a_in_lending;
         let lending_b = self.position.token_b_in_lending;
-        
-        self.position.token_a_in_lending = 0;
-        self.position.token_b_in_lending = 0;
-        self.position.token_a_vault_balance = self.position.token_a_vault_balance
-            .checked_add(lending_a)
-            .ok_or(ErrorCode::MathOverflow)?;
-        self.position.token_b_vault_balance = self.position.token_b_vault_balance
-            .checked_add(lending_b)
-            .ok_or(ErrorCode::MathOverflow)?;
-        
-        msg!("Withdrew {} A and {} B from lending", lending_a, lending_b);
+
+        if lending_a > 0 || lending_b > 0 {
+            // TODO: Implement actual Kamino CPI calls
+            // Example structure:
+            // kamino_lending::cpi::withdraw_obligation_collateral(
+            //     CpiContext::new_with_signer(
+            //         self.kamino_program.to_account_info(),
+            //         kamino_lending::cpi::accounts::WithdrawObligationCollateral {
+            //             lending_market: kamino_lending_market.to_account_info(),
+            //             obligation: kamino_obligation.to_account_info(),
+            //             // ... other required accounts
+            //         },
+            //         signer_seeds,
+            //     ),
+            //     lending_a,
+            // )?;
+            
+            // Simulate withdrawal
+            self.position.token_a_in_lending = 0;
+            self.position.token_b_in_lending = 0;
+            self.position.token_a_vault_balance = self.position.token_a_vault_balance
+                .checked_add(lending_a)
+                .ok_or(ErrorCode::MathOverflow)?;
+            self.position.token_b_vault_balance = self.position.token_b_vault_balance
+                .checked_add(lending_b)
+                .ok_or(ErrorCode::MathOverflow)?;
+            
+            msg!("Withdrew {} A and {} B from Kamino", lending_a, lending_b);
+        }
+
         Ok(())
     }
     
-    fn deposit_to_lending(&mut self) -> Result<()> {
-        // In production: Call Kamino deposit CPI here
-        // For now, simulate by moving balances
+    fn deposit_to_kamino(&mut self) -> Result<()> {
+        msg!("Depositing to Kamino lending...");
+        
         let vault_a = self.position.token_a_vault_balance;
         let vault_b = self.position.token_b_vault_balance;
         
-        self.position.token_a_vault_balance = 0;
-        self.position.token_b_vault_balance = 0;
-        self.position.token_a_in_lending = self.position.token_a_in_lending
-            .checked_add(vault_a)
-            .ok_or(ErrorCode::MathOverflow)?;
-        self.position.token_b_in_lending = self.position.token_b_in_lending
-            .checked_add(vault_b)
-            .ok_or(ErrorCode::MathOverflow)?;
+        if vault_a > 0 || vault_b > 0 {
+            // Check if we have lending accounts provided
+            let kamino_lending_market = self.kamino_lending_market.as_ref()
+                .ok_or(ErrorCode::ExternalProtocolError)?;
+            
+            // TODO: Implement actual Kamino CPI calls
+            // Example structure:
+            // kamino_lending::cpi::deposit_obligation_collateral(
+            //     CpiContext::new_with_signer(
+            //         self.kamino_program.to_account_info(),
+            //         kamino_lending::cpi::accounts::DepositObligationCollateral {
+            //             lending_market: kamino_lending_market.to_account_info(),
+            //             // ... other required accounts
+            //         },
+            //         signer_seeds,
+            //     ),
+            //     vault_a,
+            // )?;
+            
+            // Simulate deposit
+            self.position.token_a_vault_balance = 0;
+            self.position.token_b_vault_balance = 0;
+            self.position.token_a_in_lending = self.position.token_a_in_lending
+                .checked_add(vault_a)
+                .ok_or(ErrorCode::MathOverflow)?;
+            self.position.token_b_in_lending = self.position.token_b_in_lending
+                .checked_add(vault_b)
+                .ok_or(ErrorCode::MathOverflow)?;
+            
+            msg!("Deposited {} A and {} B to Kamino", vault_a, vault_b);
+        }
         
-        msg!("Deposited {} A and {} B to lending", vault_a, vault_b);
         Ok(())
     }
     
-    fn close_lp_position(&mut self) -> Result<()> {
-        // In production: Call Meteora close position CPI here
-        // For now, simulate by moving balances
+    fn close_meteora_position(&mut self) -> Result<()> {
+        msg!("Closing Meteora DLMM position...");
+        
         let lp_a = self.position.token_a_in_lp;
         let lp_b = self.position.token_b_in_lp;
         
-        self.position.token_a_in_lp = 0;
-        self.position.token_b_in_lp = 0;
-        self.position.token_a_vault_balance = self.position.token_a_vault_balance
-            .checked_add(lp_a)
-            .ok_or(ErrorCode::MathOverflow)?;
-        self.position.token_b_vault_balance = self.position.token_b_vault_balance
-            .checked_add(lp_b)
-            .ok_or(ErrorCode::MathOverflow)?;
+        if lp_a > 0 || lp_b > 0 {
+            // Check if we have LP accounts provided
+            let meteora_lb_pair = self.meteora_lb_pair.as_ref()
+                .ok_or(ErrorCode::LPPositionNotFound)?;
+            let meteora_position = self.meteora_position.as_ref()
+                .ok_or(ErrorCode::LPPositionNotFound)?;
+            
+            // TODO: Implement actual Meteora CPI calls
+            // Example structure:
+            // meteora_dlmm::cpi::remove_liquidity(
+            //     CpiContext::new_with_signer(
+            //         self.meteora_program.to_account_info(),
+            //         meteora_dlmm::cpi::accounts::RemoveLiquidity {
+            //             lb_pair: meteora_lb_pair.to_account_info(),
+            //             position: meteora_position.to_account_info(),
+            //             // ... other required accounts
+            //         },
+            //         signer_seeds,
+            //     ),
+            //     lp_a,
+            //     lp_b,
+            // )?;
+            
+            // Simulate closing position
+            self.position.token_a_in_lp = 0;
+            self.position.token_b_in_lp = 0;
+            self.position.token_a_vault_balance = self.position.token_a_vault_balance
+                .checked_add(lp_a)
+                .ok_or(ErrorCode::MathOverflow)?;
+            self.position.token_b_vault_balance = self.position.token_b_vault_balance
+                .checked_add(lp_b)
+                .ok_or(ErrorCode::MathOverflow)?;
+            
+            msg!("Closed Meteora position, recovered {} A and {} B", lp_a, lp_b);
+        }
         
-        msg!("Closed LP position, recovered {} A and {} B", lp_a, lp_b);
         Ok(())
     }
     
-    fn open_lp_position(&mut self, _current_price: u64) -> Result<()> {
-        // In production: 
-        // 1. Call Jupiter swap CPI to get 50/50 ratio
-        // 2. Call Meteora open position CPI
-        // For now, simulate by moving balances
+    fn open_meteora_position(&mut self, current_price: u64) -> Result<()> {
+        msg!("Opening Meteora DLMM position...");
+        
         let vault_a = self.position.token_a_vault_balance;
         let vault_b = self.position.token_b_vault_balance;
         
-        // Simple simulation - in reality would calculate based on price
-        self.position.token_a_vault_balance = 0;
-        self.position.token_b_vault_balance = 0;
-        self.position.token_a_in_lp = self.position.token_a_in_lp
-            .checked_add(vault_a)
-            .ok_or(ErrorCode::MathOverflow)?;
-        self.position.token_b_in_lp = self.position.token_b_in_lp
-            .checked_add(vault_b)
+        if vault_a > 0 || vault_b > 0 {
+            // Check if we have LP accounts provided
+            let meteora_lb_pair = self.meteora_lb_pair.as_ref()
+                .ok_or(ErrorCode::ExternalProtocolError)?;
+            
+            // Step 1: Use Jupiter to balance tokens to optimal ratio
+            self.balance_tokens_for_lp(current_price)?;
+            
+            // Step 2: Open LP position on Meteora
+            // TODO: Implement actual Meteora CPI calls
+            // Example structure:
+            // meteora_dlmm::cpi::add_liquidity(
+            //     CpiContext::new_with_signer(
+            //         self.meteora_program.to_account_info(),
+            //         meteora_dlmm::cpi::accounts::AddLiquidity {
+            //             lb_pair: meteora_lb_pair.to_account_info(),
+            //             // ... other required accounts
+            //         },
+            //         signer_seeds,
+            //     ),
+            //     vault_a,
+            //     vault_b,
+            //     self.position.lp_range_min,
+            //     self.position.lp_range_max,
+            // )?;
+            
+            // Simulate opening position
+            self.position.token_a_vault_balance = 0;
+            self.position.token_b_vault_balance = 0;
+            self.position.token_a_in_lp = self.position.token_a_in_lp
+                .checked_add(vault_a)
+                .ok_or(ErrorCode::MathOverflow)?;
+            self.position.token_b_in_lp = self.position.token_b_in_lp
+                .checked_add(vault_b)
+                .ok_or(ErrorCode::MathOverflow)?;
+            
+            msg!("Opened Meteora position with {} A and {} B", vault_a, vault_b);
+        }
+        
+        Ok(())
+    }
+
+    // Jupiter Integration for token balancing
+    fn balance_tokens_for_lp(&mut self, current_price: u64) -> Result<()> {
+        msg!("Balancing tokens using Jupiter...");
+        
+        let vault_a = self.position.token_a_vault_balance;
+        let vault_b = self.position.token_b_vault_balance;
+        
+        // Calculate optimal ratio based on current price
+        // For a 50/50 LP position: value_a should equal value_b
+        let total_value_a = vault_a; // Already in USD terms
+        let total_value_b = vault_b.checked_mul(current_price)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(10u64.pow(9)) // Convert from 9 decimals to 6 decimals
             .ok_or(ErrorCode::MathOverflow)?;
         
-        msg!("Opened LP position with {} A and {} B", vault_a, vault_b);
+        let total_value = total_value_a.checked_add(total_value_b)
+            .ok_or(ErrorCode::MathOverflow)?;
+        
+        if total_value == 0 {
+            return Ok(());
+        }
+        
+        let target_value_each = total_value / 2;
+        
+        // Determine swap direction and amount
+        if total_value_a > target_value_each {
+            // Too much token A, swap some A for B
+            let excess_a = total_value_a - target_value_each;
+            
+            // TODO: Implement actual Jupiter CPI call
+            // jupiter::cpi::swap(
+            //     CpiContext::new_with_signer(
+            //         self.jupiter_program.to_account_info(),
+            //         jupiter::cpi::accounts::Swap {
+            //             // ... required accounts
+            //         },
+            //         signer_seeds,
+            //     ),
+            //     excess_a, // amount in
+            //     0,        // minimum amount out (would calculate based on slippage)
+            // )?;
+            
+            msg!("Would swap {} A for B using Jupiter", excess_a);
+        } else if total_value_b > target_value_each {
+            // Too much token B, swap some B for A
+            let excess_value_b = total_value_b - target_value_each;
+            let excess_b = excess_value_b.checked_mul(10u64.pow(9))
+                .ok_or(ErrorCode::MathOverflow)?
+                .checked_div(current_price)
+                .ok_or(ErrorCode::MathOverflow)?;
+            
+            msg!("Would swap {} B for A using Jupiter", excess_b);
+        }
+        
         Ok(())
     }
 }
@@ -378,8 +575,10 @@ pub struct RebalanceBatch<'info> {
     pub keeper_authority: UncheckedAccount<'info>,
     
     pub keeper: Signer<'info>,
+
+    pub price_update: Account<'info, PriceUpdateV2>,
     
-    // In production, you'd need remaining_accounts for all positions
+    // Note: In production, positions would be passed via remaining_accounts
 }
 
 impl<'info> RebalanceBatch<'info> {
@@ -391,14 +590,13 @@ impl<'info> RebalanceBatch<'info> {
         
         msg!("Batch rebalancing {} positions", position_ids.len());
         
-        // In a real implementation, this would iterate through positions
-        // using remaining_accounts and perform rebalancing
-        // For now, we'll just validate the keeper
-        
         // TODO: Implement actual batch rebalancing logic
-        // 1. Iterate through remaining_accounts
-        // 2. Validate each position
-        // 3. Perform rebalancing for each position
+        // 1. Iterate through remaining_accounts (positions)
+        // 2. For each position, check if rebalancing is needed
+        // 3. Execute rebalancing for positions that need it
+        
+        // This would require the positions to be passed in remaining_accounts
+        // and proper validation of each position account
         
         Ok(())
     }

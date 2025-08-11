@@ -1,176 +1,172 @@
-# Capital Reallocator - Automated Lending/LP Rebalancing Protocol
+# Capital Reallocator - Automated DeFi Strategy Protocol
 
-This Solana program implements an automated capital allocation protocol that dynamically moves funds between liquidity provision (LP) positions and lending protocols based on price ranges.
+*Built on Solana with Anchor, Pyth, Meteora, and Kamino*
 
-## Architecture Overview
+A Solana program that automatically rebalances capital between liquidity provision (Meteora DLMM) and lending (Kamino) based on real-time price data from Pyth Network.
 
-### Core Components
+## 🛠️ Installation
 
-1. **Protocol Authority**: Global protocol state and configuration
-2. **User Main Account**: Tracks user's positions and statistics
-3. **Position**: Individual strategy position with LP range configuration
-4. **Vault Accounts**: Associated token accounts that hold idle funds
+## 🌐 Environment Setup
 
-### Key Features
-
-- **Automated Rebalancing**: Moves capital between Meteora LP and Kamino lending based on price
-- **Multi-Position Support**: Users can create multiple positions with different ranges
-- **Fee System**: Protocol charges configurable fees on deposits/withdrawals
-- **Position Management**: Pause/resume automation, partial withdrawals
-
-## Getting Started
-
-### Prerequisites
-
-- Rust 1.75+
-- Solana CLI 1.18+
-- Anchor CLI 0.31.1
-- Node.js 16+
-
-### Installation
-
-# Install dependencies
-`npm install`
-
-# Build the program
-`anchor build`
-
-# Run tests
-`anchor test`
-
-
-# 🧪 Capital Reallocator Testing Scripts
-
-## 🔧 Environment Setup
-
-### Environment Files
-
-Set environment variables
-
-#### Local Testing
+### Local Development
 ```bash
 export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
 export ANCHOR_WALLET=~/.config/solana/id.json
-
 solana config set --url localhost
-solana airdrop 2
 ```
 
 ### Devnet Testing
 ```bash
 export ANCHOR_PROVIDER_URL=https://api.devnet.solana.com
 export ANCHOR_WALLET=~/.config/solana/devnet.json
-
 solana config set --url devnet
-solana airdrop 2
 ```
 
-Visit the Circle faucet as instructed in the setup output:
-1. Go to: https://faucet.circle.com/
-2. Enter your wallet address (shown in setup output)
-3. Select "Solana Devnet"
-4. Request USDC
+## 📚 Usage Guide
 
+### Local Testing Workflow
 
-### Solana CLI Configuration
-
-## Local Testing
-
-### Step 1: Start Local Validator
+**1. Start Local Validator**
 ```bash
-# Terminal 1 - Keep this running
+# Terminal 1 - Keep running
 yarn validator
-
-# Or manually:
-solana-test-validator --reset --quiet
 ```
 
-### Step 2: Deploy Program
+**2. Deploy Program**
 ```bash
 # Terminal 2
-anchor deploy
+yarn build
+yarn deploy
 ```
 
-## Interactive Testing
-
+**3. Setup Environment**
 ```bash
-# Setup test environment (creates test tokens)
+yarn setup           # Create accounts
+yarn fund           # Add tokens
+yarn init-protocol   # Initialize protocol (0.5% fee)
+yarn init-user       # Initialize user account
+```
+
+**4. Create and Fund Position**
+```bash
+yarn create-position    # Create position with $100-$200 range
+yarn deposit 100 1      # Deposit 100 Token A, 1 Token B
+yarn balances          # Check all balances
+```
+
+**5. Test Operations**
+```bash
+yarn withdraw 25       # Withdraw 25%
+yarn balances         # Check updated balances
+yarn withdraw 100     # Withdraw remaining
+yarn close-position   # Close empty position
+```
+
+**6. Cleanup**
+```bash
+yarn close-accounts:confirm  # Recover SOL from accounts
+yarn clean                   # Clean state and build files
+```
+
+### Devnet Testing
+
+**1. Deploy to Devnet**
+```bash
+yarn deploy:devnet
+```
+
+**2. Setup Devnet Environment**
+```bash
 yarn setup
 
-# Initialize protocol
-yarn init-protocol
-
-# Initialize user account
-yarn init-user
-
-# Create a position
-yarn create-position
-
-# Test deposits
-yarn deposit 10 1  # 10 Token A, 1 Token B
-
-# Check balances
-yarn balances
-
-# Test withdrawals
-yarn withdraw 25     # Withdraw 25%
-yarn withdraw 100    # Withdraw remaining
-
-# Close position when empty
-yarn close-position
-
-# Clear state (user keypair, positions, pdas)
-yarn clean
+yarn fund
+```
+**3. Test with Real Prices**
+```bash
+yarn pyth-devnet price         # Get current SOL/USD price
+yarn pyth-devnet check         # Check position status
+yarn pyth-devnet rebalance     # Execute rebalancing
+yarn pyth-devnet monitor 60    # Monitor for 60 seconds
 ```
 
-## Interactive Testing Workflow
+## 📋 Available Commands
 
-### Available Commands
+### Core Operations
+| Command | Description |
+|---------|-------------|
+| `yarn build` | Build the program |
+| `yarn deploy` | Deploy to local validator |
+| `yarn deploy:devnet` | Deploy to devnet |
+| `yarn test` | Run test suite |
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `yarn setup` | Create accounts and tokens | Sets up everything |
-| `yarn init-protocol` | Initialize protocol | Sets fee structure |
-| `yarn init-user` | Initialize user account | Creates user PDA |
-| `yarn create-position` | Create trading position | Sets price range |
-| `yarn deposit` | Deposit tokens | `yarn deposit 100 5` |
-| `yarn withdraw` | Withdraw percentage | `yarn withdraw 25` |
-| `yarn balances` | Check all balances | Shows complete state |
-| `yarn close-position` | Close empty position | Cleans up accounts |
+### Environment Setup
+| Command | Description |
+|---------|-------------|
+| `yarn validator` | Start local validator |
+| `yarn setup` | Create test environment |
+| `yarn init-protocol` | Initialize protocol |
+| `yarn init-user` | Initialize user account |
 
+### Position Management
+| Command | Description |
+|---------|-------------|
+| `yarn create-position` | Create new position |
+| `yarn deposit <A> <B>` | Deposit tokens (e.g., `yarn deposit 100 1`) |
+| `yarn withdraw <percent>` | Withdraw percentage (e.g., `yarn withdraw 25`) |
+| `yarn close-position` | Close empty position |
 
-### State Persistence
-- All account addresses saved to `scripts/state.json`
-- Continue testing where you left off
-- Clean slate: `yarn clean` then restart
+### Monitoring
+| Command | Description |
+|---------|-------------|
+| `yarn balances` | Check all balances |
+| `yarn monitor` | Position dashboard |
 
-### Command Line Monitoring
+### Pyth Integration (Devnet)
+| Command | Description |
+|---------|-------------|
+| `yarn pyth-devnet price` | Get current SOL/USD price |
+| `yarn pyth-devnet check` | Check position status |
+| `yarn pyth-devnet rebalance` | Execute rebalancing |
+| `yarn pyth-devnet monitor [seconds]` | Auto-monitor position |
 
+### Cleanup
+| Command | Description |
+|---------|-------------|
+| `yarn close-accounts` | Preview account cleanup |
+| `yarn close-accounts:confirm` | Execute cleanup |
+| `yarn clean` | Clean state and build files |
+
+## 🏗️ Architecture
+
+### Core Components
+- **ProtocolAuthority**: Global protocol configuration
+- **UserMainAccount**: User's position registry  
+- **Position**: Individual strategy position
+- **Token Vaults**: Associated token accounts for idle funds
+
+### Rebalancing Logic
+1. **Price In Range** → Move to Meteora LP
+2. **Price Out of Range** → Move to Kamino Lending
+3. **Idle Funds** → Deploy based on current price
+
+### External Integrations
+- **Meteora DLMM**: `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo`
+- **Kamino Lending**: `KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD`
+- **Jupiter Aggregator**: `JUPyTerVGraWPqKUN5g8STQTQbZvCEPfbZFpRFGHHHH`
+- **Pyth Network**: Real-time price feeds with confidence intervals
+
+## 🧪 Testing
+
+### Local Testing
 ```bash
-# Check account balances
-yarn balances
-
-# View SOL balance
-solana balance
-
-# View token accounts
-spl-token accounts
-
-# Check specific token balance
-spl-token balance <TOKEN_MINT>
-
-# View account details
-solana account <ACCOUNT_ADDRESS>
-
-# View transaction details
-solana transaction <SIGNATURE>
+yarn build
+yarn deploy
+yarn test
 ```
 
-### Real-time Logs
+### Devnet Testing
 ```bash
-# View validator logs (local only)
-solana logs
-
-# View program logs
-solana logs --url devnet | grep "<YOUR_PROGRAM_ID>"
+yarn deploy:devnet
+yarn setup
+yarn pyth-devnet check
 ```

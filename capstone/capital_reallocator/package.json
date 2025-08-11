@@ -3,23 +3,46 @@
   "version": "1.0.0",
   "description": "Capital Reallocator Solana Program",
   "scripts": {
-    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "// ================== Build & Deploy ==================": "",
     "build": "anchor build",
-    "deploy:local": "anchor deploy",
+    "deploy": "anchor deploy",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
     "test": "anchor test",
+    
+    "// ================== Local Development ==================": "",
     "validator": "solana-test-validator --reset --quiet",
+    "logs": "solana logs",
+    
+    "// ================== Setup & Initialization ==================": "",
     "setup": "npx ts-node scripts/utils/setup.ts",
+    "fund": "npx ts-node scripts/utils/fund.ts",
     "init-protocol": "npx ts-node scripts/utils/init-protocol.ts",
     "init-user": "npx ts-node scripts/utils/init-user.ts",
+    
+    "// ================== Position Management ==================": "",
     "create-position": "npx ts-node scripts/utils/create-position.ts",
     "deposit": "npx ts-node scripts/utils/deposit.ts",
     "withdraw": "npx ts-node scripts/utils/withdraw.ts",
-    "balances": "npx ts-node scripts/utils/check-balances.ts",
     "close-position": "npx ts-node scripts/utils/close-position.ts",
+    
+    "// ================== Monitoring ==================": "",
+    "balances": "npx ts-node scripts/utils/check-balances.ts",
+    "monitor": "npx ts-node scripts/utils/monitor-positions.ts",
+    
+    "// ================== Pyth Integration ==================": "",
     "pyth-devnet": "npx ts-node scripts/utils/pyth-devnet.ts",
-    "clean": "rm -f scripts/state.json && anchor clean"
+    
+    "// ================== Account Cleanup ==================": "",
+    "close-accounts": "npx ts-node scripts/utils/close-all-accounts.ts",
+    "close-accounts:confirm": "npx ts-node scripts/utils/close-all-accounts.ts --confirm",
+    
+    "// ================== Utilities ==================": "",
+    "clean": "rm -f scripts/state.json && anchor clean",
+    "keys": "anchor keys list",
+    
+    "// ================== Environment Switching ==================": "",
+    "env:local": "export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 && export ANCHOR_WALLET=~/.config/solana/id.json && solana config set --url localhost",
+    "env:devnet": "export ANCHOR_PROVIDER_URL=https://api.devnet.solana.com && export ANCHOR_WALLET=~/.config/solana/id.json && solana config set --url devnet"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",

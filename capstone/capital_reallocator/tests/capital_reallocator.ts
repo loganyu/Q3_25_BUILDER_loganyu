@@ -1,3 +1,4 @@
+// tests/capital_reallocator.ts
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { CapitalReallocator } from "../target/types/capital_reallocator";

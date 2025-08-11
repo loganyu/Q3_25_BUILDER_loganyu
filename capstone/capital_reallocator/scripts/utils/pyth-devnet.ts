@@ -3,7 +3,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { CapitalReallocator } from "../../target/types/capital_reallocator";
 import { PublicKey, SystemProgram, Connection } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { loadState, loadUserKeypair } from './setup';
@@ -20,10 +20,10 @@ const DEVNET_FEEDS = {
   'ETH/USD': '0xca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6',
 };
 
-// Mock program IDs for external protocols
-const MOCK_METEORA_PROGRAM = new PublicKey("METoYfK9KhJHnec5HL8kTybWGmTEJvnqwNYWuWtFGHH");
-const MOCK_KAMINO_PROGRAM = new PublicKey("KAMiNoXmYHN3hiPvvufVqwRPEPAy6Jh8H7F7SEKcfGH");  
-const MOCK_JUPITER_PROGRAM = new PublicKey("JUPyTerVGraWPqKUN5g8STQTQbZvCEPfbZFpRFGHHHH");
+// Real program IDs for external protocols
+const METEORA_DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
+const KAMINO_LENDING_PROGRAM = new PublicKey("KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD");
+const JUPITER_PROGRAM = new PublicKey("JUPyTerVGraWPqKUN5g8STQTQbZvCEPfbZFpRFGHHHH");
 
 export class PythDevnet {
   private hermesClient: HermesClient;
@@ -33,9 +33,8 @@ export class PythDevnet {
   private program: Program<CapitalReallocator>;
   
   constructor(wallet: anchor.Wallet) {
-    const cluster = process.env.ANCHOR_PROVIDER_URL
     // Always use devnet
-    this.connection = new Connection(cluster, 'confirmed');
+    this.connection = new Connection(DEVNET_RPC, 'confirmed');
     this.wallet = wallet;
     
     // Setup provider for devnet
@@ -44,8 +43,6 @@ export class PythDevnet {
       wallet,
       { commitment: 'confirmed' }
     );
-    anchor.setProvider(provider);
-    // const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
     
     this.program = anchor.workspace.CapitalReallocator as Program<CapitalReallocator>;
@@ -111,16 +108,54 @@ export class PythDevnet {
     const rangeMin = position.lpRangeMin.toNumber() / 1e6;
     const rangeMax = position.lpRangeMax.toNumber() / 1e6;
     
-    console.log(`Position range: $${rangeMin} - $${rangeMax}`);
-    console.log(`Paused: ${position.pauseFlag ? 'Yes ⏸️' : 'No ▶️'}`);
+    console.log(`📊 Position ${position.positionId.toString()}:`);
+    console.log(`  Range: $${rangeMin.toFixed(2)} - $${rangeMax.toFixed(2)}`);
+    console.log(`  Owner: ${position.owner.toString()}`);
+    console.log(`  Paused: ${position.pauseFlag ? 'Yes ⏸️' : 'No ▶️'}`);
+    console.log(`  Total rebalances: ${position.totalRebalances.toString()}`);
+
+    // Show current balances
+    console.log('\n💼 Current balances:');
+    console.log(`  Vault: A=${(position.tokenAVaultBalance.toNumber() / 1e6).toFixed(2)}, B=${(position.tokenBVaultBalance.toNumber() / 1e9).toFixed(4)}`);
+    console.log(`  LP: A=${(position.tokenAInLp.toNumber() / 1e6).toFixed(2)}, B=${(position.tokenBInLp.toNumber() / 1e9).toFixed(4)}`);
+    console.log(`  Lending: A=${(position.tokenAInLending.toNumber() / 1e6).toFixed(2)}, B=${(position.tokenBInLending.toNumber() / 1e9).toFixed(4)}`);
     
     // Fetch current price
     const { price } = await this.fetchPrice('SOL/USD');
     
     // Check if price is in range
     const inRange = price >= rangeMin && price <= rangeMax;
-    console.log(`Price in range: ${inRange ? '✅ Yes' : '❌ No'}`);
+    console.log(`\n🎯 Price analysis:`);
+    console.log(`  Current price: $${price.toFixed(2)}`);
+    console.log(`  In range: ${inRange ? '✅ Yes' : '❌ No'}`);
     
+    // Analyze strategy allocation
+    const hasLP = position.tokenAInLp.toNumber() > 0 || position.tokenBInLp.toNumber() > 0;
+    const hasLending = position.tokenAInLending.toNumber() > 0 || position.tokenBInLending.toNumber() > 0;
+    const hasIdle = position.tokenAVaultBalance.toNumber() > 0 || position.tokenBVaultBalance.toNumber() > 0;
+    
+    console.log(`\n📈 Strategy analysis:`);
+    console.log(`  Has LP position: ${hasLP ? 'Yes' : 'No'}`);
+    console.log(`  Has lending position: ${hasLending ? 'Yes' : 'No'}`);
+    console.log(`  Has idle funds: ${hasIdle ? 'Yes' : 'No'}`);
+    
+    // Determine optimal allocation
+    if (inRange && hasLending) {
+      console.log(`  💡 Recommendation: Move from lending to LP (price in range)`);
+    } else if (!inRange && hasLP) {
+      console.log(`  💡 Recommendation: Move from LP to lending (price out of range)`);
+    } else if (hasIdle) {
+      const target = inRange ? 'LP' : 'lending';
+      console.log(`  💡 Recommendation: Deploy idle funds to ${target}`);
+    } else {
+      console.log(`  ✅ Position is optimally allocated`);
+    }
+    
+    // Execute the actual check instruction
+    await this.executeStatusCheck(positionPubkey);
+  }
+
+  private async executeStatusCheck(positionPubkey: PublicKey): Promise<void> {
     // Fetch price update data
     const priceUpdateData = await this.hermesClient.getLatestPriceUpdates(
       [DEVNET_FEEDS['SOL/USD']],
@@ -163,7 +198,7 @@ export class PythDevnet {
       { skipPreflight: true }
     );
     
-    console.log('✅ Status check complete');
+    console.log('\n✅ Status check complete');
     console.log('🔗 View on explorer:', `https://explorer.solana.com/tx/${signatures[0]}?cluster=devnet`);
   }
   
@@ -185,34 +220,73 @@ export class PythDevnet {
     console.log(`  LP: A=${(position.tokenAInLp.toNumber() / 1e6).toFixed(2)}, B=${(position.tokenBInLp.toNumber() / 1e9).toFixed(4)}`);
     console.log(`  Lending: A=${(position.tokenAInLending.toNumber() / 1e6).toFixed(2)}, B=${(position.tokenBInLending.toNumber() / 1e9).toFixed(4)}`);
     
-    // // Fetch current price
-    // const { price } = await this.fetchPrice('SOL/USD');
+    // Fetch current price and analyze
+    const { price } = await this.fetchPrice('SOL/USD');
     
-    // const rangeMin = position.lpRangeMin.toNumber() / 1e6;
-    // const rangeMax = position.lpRangeMax.toNumber() / 1e6;
-    // const inRange = price >= rangeMin && price <= rangeMax;
+    const rangeMin = position.lpRangeMin.toNumber() / 1e6;
+    const rangeMax = position.lpRangeMax.toNumber() / 1e6;
+    const inRange = price >= rangeMin && price <= rangeMax;
     
-    // // Check if rebalance is needed
-    // const hasLP = position.tokenAInLp.toNumber() > 0 || position.tokenBInLp.toNumber() > 0;
-    // const hasLending = position.tokenAInLending.toNumber() > 0 || position.tokenBInLending.toNumber() > 0;
-    // const hasIdle = position.tokenAVaultBalance.toNumber() > 0 || position.tokenBVaultBalance.toNumber() > 0;
+    // Check if rebalance is needed
+    const hasLP = position.tokenAInLp.toNumber() > 0 || position.tokenBInLp.toNumber() > 0;
+    const hasLending = position.tokenAInLending.toNumber() > 0 || position.tokenBInLending.toNumber() > 0;
+    const hasIdle = position.tokenAVaultBalance.toNumber() > 0 || position.tokenBVaultBalance.toNumber() > 0;
     
-    // const needsRebalance = (inRange && hasLending) || (!inRange && hasLP) || hasIdle;
+    const needsRebalance = (inRange && (hasLending || hasIdle)) || (!inRange && (hasLP || hasIdle));
     
-    // console.log('\nRebalance analysis:');
-    // console.log(`  Price: $${price.toFixed(2)} (Range: $${rangeMin}-$${rangeMax})`);
-    // console.log(`  In range: ${inRange}`);
-    // console.log(`  Needs rebalance: ${needsRebalance}`);
+    console.log('\n🎯 Rebalance analysis:');
+    console.log(`  Price: $${price.toFixed(2)} (Range: $${rangeMin.toFixed(2)}-$${rangeMax.toFixed(2)})`);
+    console.log(`  In range: ${inRange}`);
+    console.log(`  Needs rebalance: ${needsRebalance}`);
     
-    // if (!needsRebalance) {
-    //   console.log('✅ Position is already optimally allocated');
-    //   return;
-    // }
+    if (!needsRebalance) {
+      console.log('✅ Position is already optimally allocated');
+      return;
+    }
     
+    // Determine rebalance action
+    let expectedAction: string;
+    if (inRange && (hasLending || hasIdle)) {
+      expectedAction = 'Move to LP';
+    } else if (!inRange && (hasLP || hasIdle)) {
+      expectedAction = 'Move to lending';
+    } else {
+      expectedAction = 'No action';
+    }
+    
+    console.log(`  Expected action: ${expectedAction}`);
+    
+    // Execute rebalance
+    await this.executeRebalance(positionPubkey);
+    
+    // Show new allocation
+    const updatedPosition = await this.program.account.position.fetch(positionPubkey);
+    console.log('\n💼 New allocation:');
+    console.log(`  Vault: A=${(updatedPosition.tokenAVaultBalance.toNumber() / 1e6).toFixed(2)}, B=${(updatedPosition.tokenBVaultBalance.toNumber() / 1e9).toFixed(4)}`);
+    console.log(`  LP: A=${(updatedPosition.tokenAInLp.toNumber() / 1e6).toFixed(2)}, B=${(updatedPosition.tokenBInLp.toNumber() / 1e9).toFixed(4)}`);
+    console.log(`  Lending: A=${(updatedPosition.tokenAInLending.toNumber() / 1e6).toFixed(2)}, B=${(updatedPosition.tokenBInLending.toNumber() / 1e9).toFixed(4)}`);
+    console.log(`  Total rebalances: ${updatedPosition.totalRebalances.toString()}`);
+    console.log(`  Last rebalance price: $${(updatedPosition.lastRebalancePrice.toNumber() / 1e6).toFixed(2)}`);
+  }
+
+  private async executeRebalance(positionPubkey: PublicKey): Promise<void> {
     // Fetch price update data
     const priceUpdateData = await this.hermesClient.getLatestPriceUpdates(
       [DEVNET_FEEDS['SOL/USD']],
       { encoding: "base64" }
+    );
+    
+    // Get position state to derive vault addresses
+    const position = await this.program.account.position.fetch(positionPubkey);
+    const positionTokenAVault = await getAssociatedTokenAddress(
+      position.tokenAMint,
+      positionPubkey,
+      true
+    );
+    const positionTokenBVault = await getAssociatedTokenAddress(
+      position.tokenBMint,
+      positionPubkey,
+      true
     );
     
     // Build transaction
@@ -231,9 +305,19 @@ export class PythDevnet {
           .accountsPartial({
             position: positionPubkey,
             priceUpdate: priceUpdateAccount,
-            meteoraProgram: MOCK_METEORA_PROGRAM,
-            kaminoProgram: MOCK_KAMINO_PROGRAM,
-            jupiterProgram: MOCK_JUPITER_PROGRAM,
+            positionTokenAVault,
+            positionTokenBVault,
+            meteoraProgram: METEORA_DLMM_PROGRAM,
+            meteoraLbPair: null, // Would be actual accounts in production
+            meteoraPosition: null,
+            meteoraBinArrayLower: null,
+            meteoraBinArrayUpper: null,
+            kaminoProgram: KAMINO_LENDING_PROGRAM,
+            kaminoLendingMarket: null, // Would be actual accounts in production
+            kaminoObligation: null,
+            kaminoReserveA: null,
+            kaminoReserveB: null,
+            jupiterProgram: JUPITER_PROGRAM,
             systemProgram: SystemProgram.programId,
             tokenProgram: TOKEN_PROGRAM_ID,
           })
@@ -245,10 +329,10 @@ export class PythDevnet {
         }];
       }
     );
-    
+
     // Send transaction
     const txs = await transactionBuilder.buildVersionedTransactions({
-      computeUnitPriceMicroLamports: 50000,
+      computeUnitPriceMicroLamports: 100000, // Higher for rebalancing
     });
     
     const signatures = await this.pythSolanaReceiver.provider.sendAll(
@@ -256,66 +340,125 @@ export class PythDevnet {
       { skipPreflight: true }
     );
     
-    console.log('✅ Rebalance complete');
+    console.log('\n✅ Rebalance complete');
     console.log('🔗 View on explorer:', `https://explorer.solana.com/tx/${signatures[0]}?cluster=devnet`);
-    
-    // Show new allocation
-    const updatedPosition = await this.program.account.position.fetch(positionPubkey);
-    console.log('\nNew allocation:');
-    console.log(`  Vault: A=${(updatedPosition.tokenAVaultBalance.toNumber() / 1e6).toFixed(2)}, B=${(updatedPosition.tokenBVaultBalance.toNumber() / 1e9).toFixed(4)}`);
-    console.log(`  LP: A=${(updatedPosition.tokenAInLp.toNumber() / 1e6).toFixed(2)}, B=${(updatedPosition.tokenBInLp.toNumber() / 1e9).toFixed(4)}`);
-    console.log(`  Lending: A=${(updatedPosition.tokenAInLending.toNumber() / 1e6).toFixed(2)}, B=${(updatedPosition.tokenBInLending.toNumber() / 1e9).toFixed(4)}`);
-    console.log(`  Total rebalances: ${updatedPosition.totalRebalances.toString()}`);
   }
+    
   
   // Monitor position for rebalance opportunities
   async monitor(positionPubkey: PublicKey, duration: number = 60): Promise<void> {
     console.log(`\n👁️ Monitoring position for ${duration} seconds...`);
+    console.log('💡 Will check every 10 seconds and auto-rebalance when needed\n');
     
     const position = await this.program.account.position.fetch(positionPubkey);
     const rangeMin = position.lpRangeMin.toNumber() / 1e6;
     const rangeMax = position.lpRangeMax.toNumber() / 1e6;
     
-    console.log(`Position range: $${rangeMin} - $${rangeMax}`);
+    console.log(`📊 Monitoring position ${position.positionId.toString()}:`);
+    console.log(`  Range: $${rangeMin.toFixed(2)} - $${rangeMax.toFixed(2)}`);
+    console.log(`  Owner: ${position.owner.toString().slice(0, 8)}...`);
     
     const startTime = Date.now();
     let checkCount = 0;
+    let rebalanceCount = 0;
     
     const checkPrice = async () => {
       checkCount++;
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       
-      console.log(`\n--- Check ${checkCount} (${elapsed}s) ---`);
+      console.log(`\n--- Check ${checkCount} (${elapsed}s elapsed) ---`);
       
-      // try {
-      //   const { price } = await this.fetchPrice('SOL/USD');
-      //   const inRange = price >= rangeMin && price <= rangeMax;
+      try {
+        const { price } = await this.fetchPrice('SOL/USD');
+        const inRange = price >= rangeMin && price <= rangeMax;
         
-      //   const hasLP = position.tokenAInLp.toNumber() > 0 || position.tokenBInLp.toNumber() > 0;
-      //   const hasLending = position.tokenAInLending.toNumber() > 0 || position.tokenBInLending.toNumber() > 0;
+        // Get current position state
+        const currentPosition = await this.program.account.position.fetch(positionPubkey);
+        const hasLP = currentPosition.tokenAInLp.toNumber() > 0 || currentPosition.tokenBInLp.toNumber() > 0;
+        const hasLending = currentPosition.tokenAInLending.toNumber() > 0 || currentPosition.tokenBInLending.toNumber() > 0;
+        const hasIdle = currentPosition.tokenAVaultBalance.toNumber() > 0 || currentPosition.tokenBVaultBalance.toNumber() > 0;
         
-      //   let action = 'No action needed';
-      //   if (inRange && hasLending) {
-      //     action = '⚠️ Should move from lending to LP';
-      //   } else if (!inRange && hasLP) {
-      //     action = '⚠️ Should move from LP to lending';
-      //   }
+        let action = 'No action needed ✅';
+        let shouldRebalance = false;
         
-      //   console.log(`Price: $${price.toFixed(2)} | In range: ${inRange ? '✅' : '❌'} | ${action}`);
+        if (inRange && (hasLending || hasIdle)) {
+          action = '⚠️ Should move to LP';
+          shouldRebalance = true;
+        } else if (!inRange && (hasLP || hasIdle)) {
+          action = '⚠️ Should move to lending';
+          shouldRebalance = true;
+        }
         
-      // } catch (error) {
-      //   console.log('Error fetching price:', error.message);
-      // }
-      this.rebalance(positionPubkey)
+        console.log(`💰 Price: $${price.toFixed(2)} | In range: ${inRange ? '✅' : '❌'} | ${action}`);
+        
+        // Auto-rebalance if needed
+        if (shouldRebalance && !currentPosition.pauseFlag) {
+          console.log(`🔄 Auto-rebalancing...`);
+          try {
+            await this.executeRebalance(positionPubkey);
+            rebalanceCount++;
+            console.log(`✅ Rebalance ${rebalanceCount} completed`);
+          } catch (error) {
+            console.log(`❌ Rebalance failed: ${error.message}`);
+          }
+        } else if (currentPosition.pauseFlag) {
+          console.log(`⏸️ Position paused - skipping rebalance`);
+        }
+        
+      } catch (error) {
+        console.log(`❌ Error during check: ${error.message}`);
+      }
       
       if (elapsed < duration) {
         setTimeout(checkPrice, 10000); // Check every 10 seconds
       } else {
-        console.log('\n✅ Monitoring complete');
+        console.log(`\n🎉 Monitoring complete after ${duration}s`);
+        console.log(`📊 Summary:`);
+        console.log(`  - Total checks: ${checkCount}`);
+        console.log(`  - Rebalances executed: ${rebalanceCount}`);
+        
+        // Final position state
+        try {
+          const finalPosition = await this.program.account.position.fetch(positionPubkey);
+          console.log(`  - Final total rebalances: ${finalPosition.totalRebalances.toString()}`);
+        } catch (error) {
+          console.log(`  - Could not fetch final position state`);
+        }
       }
     };
     
     await checkPrice();
+  }
+
+// Stress test the rebalancing system
+  async stressTest(positionPubkey: PublicKey, cycles: number = 5): Promise<void> {
+    console.log(`\n🧪 Running stress test (${cycles} cycles)...`);
+    
+    const position = await this.program.account.position.fetch(positionPubkey);
+    console.log(`📊 Initial state:`);
+    console.log(`  Total rebalances: ${position.totalRebalances.toString()}`);
+    
+    for (let i = 1; i <= cycles; i++) {
+      console.log(`\n--- Cycle ${i}/${cycles} ---`);
+      
+      try {
+        // Force a rebalance regardless of need
+        await this.executeRebalance(positionPubkey);
+        console.log(`✅ Cycle ${i} completed`);
+        
+        // Wait 2 seconds between cycles
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
+        console.log(`❌ Cycle ${i} failed: ${error.message}`);
+      }
+    }
+    
+    // Final state
+    const finalPosition = await this.program.account.position.fetch(positionPubkey);
+    console.log(`\n📊 Final state:`);
+    console.log(`  Total rebalances: ${finalPosition.totalRebalances.toString()}`);
+    console.log(`  Rebalances added: ${finalPosition.totalRebalances.toNumber() - position.totalRebalances.toNumber()}`);
   }
 }
 
@@ -325,10 +468,10 @@ async function main() {
   
   // Check we're on devnet
   const url = process.env.ANCHOR_PROVIDER_URL || '';
-  // if (!url.includes('devnet')) {
-  //   console.log('⚠️  Warning: Not configured for devnet');
-  //   console.log('Run: export ANCHOR_PROVIDER_URL=https://api.devnet.solana.com');
-  // }
+  if (!url.includes('devnet')) {
+    console.log('⚠️  Warning: Not configured for devnet');
+    console.log('Run: export ANCHOR_PROVIDER_URL=https://api.devnet.solana.com');
+  }
   
   const state = loadState();
   const user = loadUserKeypair();

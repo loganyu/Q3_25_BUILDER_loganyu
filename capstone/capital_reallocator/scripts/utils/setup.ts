@@ -8,8 +8,7 @@ import {
   createMint, 
   createAccount, 
   mintTo,
-  getAccount,
-  createSyncNativeInstruction
+  getAccount
 } from "@solana/spl-token";
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 
@@ -37,113 +36,6 @@ interface TestState {
   positionTokenBVault?: string;
 }
 
-async function fundDevnetAccounts(
-  provider: anchor.AnchorProvider, 
-  user: Keypair, 
-  userTokenA: PublicKey, 
-  userTokenB: PublicKey
-) {
-  console.log('💰 Setting up devnet token funding...');
-  
-  // Check SOL balance
-  const solBalance = await provider.connection.getBalance(user.publicKey);
-  console.log('💰 SOL balance:', (solBalance / LAMPORTS_PER_SOL).toFixed(4));
-  
-  if (solBalance < 2 * LAMPORTS_PER_SOL) {
-    console.log('💸 Getting more SOL...');
-    try {
-      const signature = await provider.connection.requestAirdrop(
-        user.publicKey, 
-        2 * LAMPORTS_PER_SOL
-      );
-      await provider.connection.confirmTransaction(signature);
-      console.log('✅ Airdropped 2 SOL');
-    } catch (error) {
-      console.log('⚠️  Airdrop failed, you may need SOL manually');
-    }
-  }
-  
-  // Check USDC balance
-  try {
-    const usdcAccount = await getAccount(provider.connection, userTokenA);
-    const usdcBalance = Number(usdcAccount.amount) / 10**6;
-    console.log('💵 USDC balance:', usdcBalance.toFixed(6));
-    
-    if (usdcBalance === 0) {
-      console.log('');
-      console.log('🎯 To get USDC:');
-      console.log('1. Visit: https://faucet.circle.com/');
-      console.log('2. Enter your address:', user.publicKey.toString());
-      console.log('3. Select Solana Devnet and request USDC');
-      console.log('');
-    }
-  } catch (error) {
-    console.log('💵 USDC balance: 0 (account created, needs funding)');
-  }
-  
-  // Handle wrapped SOL
-  console.log('🔄 Setting up wrapped SOL...');
-  
-  try {
-    const wsolAccount = await getAccount(provider.connection, userTokenB);
-    const wsolBalance = Number(wsolAccount.amount) / 10**9;
-    console.log('💰 Wrapped SOL balance:', wsolBalance.toFixed(9));
-    
-    if (wsolBalance < 1.0) {
-      await wrapSol(provider, user, userTokenB, 1.5); // Wrap 1.5 SOL
-    }
-  } catch (error) {
-    // Account exists but empty, wrap some SOL
-    await wrapSol(provider, user, userTokenB, 1.5);
-  }
-  
-  console.log('');
-  console.log('✅ Devnet funding setup complete!');
-  console.log('💡 Run the init-protocol step next');
-}
-
-async function wrapSol(
-  provider: anchor.AnchorProvider, 
-  user: Keypair, 
-  wsolAccount: PublicKey, 
-  amount: number
-) {
-  console.log(`🔄 Wrapping ${amount} SOL...`);
-  
-  const wrapLamports = amount * LAMPORTS_PER_SOL;
-  
-  // Create transaction to wrap SOL
-  const transaction = new anchor.web3.Transaction();
-  
-  // Transfer SOL to the wrapped SOL account
-  transaction.add(
-    SystemProgram.transfer({
-      fromPubkey: user.publicKey,
-      toPubkey: wsolAccount,
-      lamports: wrapLamports,
-    })
-  );
-  
-  // Sync native (converts SOL to wrapped SOL tokens)
-  transaction.add(createSyncNativeInstruction(wsolAccount));
-  
-  try {
-    const txSignature = await provider.connection.sendTransaction(transaction, [user]);
-    await provider.connection.confirmTransaction(txSignature);
-    
-    console.log('✅ Wrapped SOL successfully!');
-    console.log('🔗 View transaction:', 
-      `https://explorer.solana.com/tx/${txSignature}?cluster=devnet`);
-    
-    // Check new balance
-    const account = await getAccount(provider.connection, wsolAccount);
-    console.log('💰 Wrapped SOL balance:', (Number(account.amount) / 10**9).toFixed(9));
-    
-  } catch (error) {
-    console.error('❌ Error wrapping SOL:', error);
-  }
-}
-
 async function setupTestEnvironment() {
   console.log('🏗️  Setting up test environment...');
   
@@ -159,19 +51,23 @@ async function setupTestEnvironment() {
   const user = Keypair.generate();
   console.log('👤 Created user:', user.publicKey.toString());
   
-  // Airdrop SOL
-  console.log('💸 Requesting SOL airdrop...');
-  const signature = await provider.connection.requestAirdrop(user.publicKey, 10 * LAMPORTS_PER_SOL);
-  await provider.connection.confirmTransaction(signature);
+  const isDevnet = provider.connection.rpcEndpoint.includes('devnet');
   
-  const balance = await provider.connection.getBalance(user.publicKey);
-  console.log('✅ User balance:', balance / LAMPORTS_PER_SOL, 'SOL');
+  // Only airdrop on local, not devnet
+  if (!isDevnet) {
+    console.log('💸 Requesting SOL airdrop...');
+    const signature = await provider.connection.requestAirdrop(user.publicKey, 10 * LAMPORTS_PER_SOL);
+    await provider.connection.confirmTransaction(signature);
+    
+    const balance = await provider.connection.getBalance(user.publicKey);
+    console.log('✅ User balance:', (balance / LAMPORTS_PER_SOL).toFixed(4), 'SOL');
+  } else {
+    console.log('💡 Devnet detected - skipping automatic funding');
+  }
 
   // Create or use existing token mints
   let tokenAMint: PublicKey;
   let tokenBMint: PublicKey;
-  
-  const isDevnet = provider.connection.rpcEndpoint.includes('devnet');
   
   if (isDevnet) {
     // Use real USDC and SOL on devnet
@@ -217,29 +113,39 @@ async function setupTestEnvironment() {
     console.log('💼 USDC account:', userTokenA.toString());
     console.log('💼 Wrapped SOL account:', userTokenB.toString());
     
-    // Create accounts if they don't exist
+    // Create accounts if they don't exist (will fail if no SOL, that's ok)
     try {
       await getAccount(provider.connection, userTokenA);
+      console.log('✅ USDC account already exists');
     } catch {
-      const createUSDCTx = new anchor.web3.Transaction().add(
-        createAssociatedTokenAccountInstruction(
-          user.publicKey, userTokenA, user.publicKey, tokenAMint
-        )
-      );
-      await provider.connection.sendTransaction(createUSDCTx, [user]);
-      console.log('✅ Created USDC account');
+      try {
+        const createUSDCTx = new anchor.web3.Transaction().add(
+          createAssociatedTokenAccountInstruction(
+            user.publicKey, userTokenA, user.publicKey, tokenAMint
+          )
+        );
+        await provider.connection.sendTransaction(createUSDCTx, [user]);
+        console.log('✅ Created USDC account');
+      } catch (error) {
+        console.log('⚠️  Could not create USDC account (need SOL first)');
+      }
     }
     
     try {
       await getAccount(provider.connection, userTokenB);
+      console.log('✅ Wrapped SOL account already exists');
     } catch {
-      const createSOLTx = new anchor.web3.Transaction().add(
-        createAssociatedTokenAccountInstruction(
-          user.publicKey, userTokenB, user.publicKey, tokenBMint
-        )
-      );
-      await provider.connection.sendTransaction(createSOLTx, [user]);
-      console.log('✅ Created wrapped SOL account');
+      try {
+        const createSOLTx = new anchor.web3.Transaction().add(
+          createAssociatedTokenAccountInstruction(
+            user.publicKey, userTokenB, user.publicKey, tokenBMint
+          )
+        );
+        await provider.connection.sendTransaction(createSOLTx, [user]);
+        console.log('✅ Created wrapped SOL account');
+      } catch (error) {
+        console.log('⚠️  Could not create wrapped SOL account (need SOL first)');
+      }
     }
   } else {
     // Local testing - create regular token accounts
@@ -256,16 +162,8 @@ async function setupTestEnvironment() {
       tokenBMint,
       user.publicKey
     );
-  }
-
-  // Fund token accounts
-  console.log('🪙 Funding user token accounts...');
-  
-  if (isDevnet) {
-    // Fund devnet accounts with real tokens
-    await fundDevnetAccounts(provider, user, userTokenA, userTokenB);
-  } else {
-    // Local testing - mint test tokens
+    
+    // Fund local accounts immediately
     await mintTo(
       provider.connection,
       user,
@@ -315,26 +213,27 @@ async function setupTestEnvironment() {
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
   console.log('💾 Saved state to:', STATE_FILE);
 
-  console.log('\n✅ Setup complete! You can now:');
-  console.log('1. Run: npx ts-node scripts/utils/init-protocol.ts');
-  console.log('2. Run: npx ts-node scripts/utils/init-user.ts');
-  console.log('3. Run: npx ts-node scripts/utils/create-position.ts');
-
-  return {
-    user,
-    tokenAMint,
-    tokenBMint,
-    userTokenA,
-    userTokenB,
-    protocolAuthority,
-    userMainAccount,
-    program
-  };
+  console.log('\n✅ Setup complete!');
+  
+  if (isDevnet) {
+    console.log('\n📋 Next steps for devnet:');
+    console.log('1. Get SOL from: https://faucet.solana.com/');
+    console.log('   Your address: ' + user.publicKey.toString());
+    console.log('2. Get USDC from: https://faucet.circle.com/');
+    console.log('   Your address: ' + user.publicKey.toString());
+    console.log('3. Run: yarn fund  (to create accounts and wrap SOL)');
+    console.log('4. Then: yarn init-protocol');
+  } else {
+    console.log('\n🎯 Next steps:');
+    console.log('1. yarn init-protocol');
+    console.log('2. yarn init-user');
+    console.log('3. yarn create-position');
+  }
 }
 
 export function loadState(): TestState {
   if (!existsSync(STATE_FILE)) {
-    throw new Error('State file not found. Run setup first: npx ts-node scripts/utils/setup.ts');
+    throw new Error('State file not found. Run setup first: yarn setup');
   }
   return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
 }
