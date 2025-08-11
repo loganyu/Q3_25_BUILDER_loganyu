@@ -11,7 +11,7 @@ pub mod constants;
 
 use instructions::*;
 
-declare_id!("6MfEgfgcnoGujn36FJCNoKecu7vCzXVX1K7Hu4qQdTKB");
+declare_id!("6CMb7MGxBA7ukm9y6NHx5ghnTuwMrTSr4aeYV5oqNhSh");
 
 #[program]
 pub mod capital_reallocator {

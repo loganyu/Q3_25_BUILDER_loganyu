@@ -5,10 +5,10 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-capital_reallocator = "6MfEgfgcnoGujn36FJCNoKecu7vCzXVX1K7Hu4qQdTKB"
-
 [programs.devnet]
+capital_reallocator = "6CMb7MGxBA7ukm9y6NHx5ghnTuwMrTSr4aeYV5oqNhSh"
+
+[programs.localnet]
 capital_reallocator = "6MfEgfgcnoGujn36FJCNoKecu7vCzXVX1K7Hu4qQdTKB"
 
 [registry]

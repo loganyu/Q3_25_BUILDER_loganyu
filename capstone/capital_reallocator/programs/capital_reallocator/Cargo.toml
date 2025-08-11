@@ -26,9 +26,12 @@ anchor-spl = "0.31.1"
 pyth-sdk-solana = "0.10.5"
 pyth-solana-receiver-sdk = "0.6.1"
 
-# Math and utilities
-uint = "0.9.5"
-static_assertions = "1.1.0"
+[patch.crates-io]
+base64ct = "1.6.0"
+
+# Pyth price feeds
+pyth-sdk-solana = "0.10.5"
+pyth-solana-receiver-sdk = "0.6.1"
 
 # Optional: External protocol CPI
 # meteora-dlmm = { git = "https://github.com/MeteoraAg/dlmm-sdk", optional = true }
