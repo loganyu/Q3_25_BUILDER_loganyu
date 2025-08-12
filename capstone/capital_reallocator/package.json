@@ -16,6 +16,7 @@
     "// ================== Setup & Initialization ==================": "",
     "setup": "npx ts-node scripts/utils/setup.ts",
     "fund": "npx ts-node scripts/utils/fund.ts",
+    "fund-devnet": "npx ts-node scripts/utils/fund-devnet.ts",
     "init-protocol": "npx ts-node scripts/utils/init-protocol.ts",
     "init-user": "npx ts-node scripts/utils/init-user.ts",
     

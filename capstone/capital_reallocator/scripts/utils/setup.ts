@@ -1,5 +1,6 @@
 // scripts/utils/setup.ts
 import * as anchor from "@coral-xyz/anchor";
+import bs58 from 'bs58';
 import { Program } from "@coral-xyz/anchor";
 import { CapitalReallocator } from "../../target/types/capital_reallocator";
 import { PublicKey, SystemProgram, LAMPORTS_PER_SOL, Keypair } from "@solana/web3.js";
@@ -16,6 +17,8 @@ const STATE_FILE = './scripts/state.json';
 
 interface TestState {
   user: string;
+  userPublicKey: string;
+  userSecretKeyBase58: string;
   tokenAMint: string;
   tokenBMint: string;
   userTokenA: string;
@@ -71,7 +74,7 @@ async function setupTestEnvironment() {
   
   if (isDevnet) {
     // Use real USDC and SOL on devnet
-    tokenAMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // USDC
+    tokenAMint = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // USDC
     tokenBMint = new PublicKey('So11111111111111111111111111111111111111112'); // SOL (wrapped)
     console.log('🌐 Using devnet tokens:');
     console.log('🪙 USDC:', tokenAMint.toString());
@@ -202,6 +205,8 @@ async function setupTestEnvironment() {
   // Save state to file for other scripts
   const state: TestState = {
     user: JSON.stringify(Array.from(user.secretKey)),
+    userPublicKey: user.publicKey.toString(),
+    userSecretKeyBase58: bs58.encode(user.secretKey),
     tokenAMint: tokenAMint.toString(),
     tokenBMint: tokenBMint.toString(),
     userTokenA: userTokenA.toString(),

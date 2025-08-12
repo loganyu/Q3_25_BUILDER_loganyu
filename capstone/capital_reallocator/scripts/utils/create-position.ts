@@ -12,8 +12,8 @@ async function createPosition() {
 
   // Get command line arguments or use defaults
   const args = process.argv.slice(2);
-  const rangeMinUSD = args[0] ? parseInt(args[0]) : 170; // Default: 170
-  const rangeMaxUSD = args[1] ? parseInt(args[1]) : 180;    // Default: 180
+  const rangeMinUSD = args[0] ? parseInt(args[0]) : 150; // Default: 150
+  const rangeMaxUSD = args[1] ? parseInt(args[1]) : 160;    // Default: 160
   
   // Load state and setup
   const state = loadState();
@@ -25,8 +25,8 @@ async function createPosition() {
   
   // Position parameters
   const positionId = new BN(1);
-  const lpRangeMin = new BN(rangeMinUSD * 10**6); // $100
-  const lpRangeMax = new BN(rangeMaxUSD * 10**6); // $200
+  const lpRangeMin = new BN(rangeMinUSD * 10**6); 
+  const lpRangeMax = new BN(rangeMaxUSD * 10**6); 
   
   console.log('🔢 Position ID:', positionId.toString());
   console.log(`📈 LP Range: $${rangeMinUSD}-$${rangeMaxUSD}`);

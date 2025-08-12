@@ -12,8 +12,8 @@ async function depositTokens() {
   
   // Get command line arguments or use defaults
   const args = process.argv.slice(2);
-  const amountA = args[0] ? parseInt(args[0]) : 1000; // Default: 1000 Token A
-  const amountB = args[1] ? parseInt(args[1]) : 5;    // Default: 5 Token B
+  const amountA = args[0] ? parseInt(args[0]) : 10; // Default: 10 Token A
+  const amountB = args[1] ? parseInt(args[1]) : 1;    // Default: 1 Token B
   
   console.log('💰 Depositing:', amountA, 'Token A,', amountB, 'Token B');
   
