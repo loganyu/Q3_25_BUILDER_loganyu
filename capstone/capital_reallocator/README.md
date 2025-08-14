@@ -50,7 +50,7 @@ yarn init-user       # Initialize user account
 **4. Create and Fund Position**
 ```bash
 yarn create-position    # Create position with $100-$200 range
-yarn deposit 100 1      # Deposit 100 Token A, 1 Token B
+yarn deposit 1 0.1      # Deposit 100 Token A, 1 Token B
 yarn balances          # Check all balances
 ```
 
@@ -79,7 +79,7 @@ yarn deploy:devnet
 ```bash
 yarn setup
 
-yarn fund
+yarn fund-devnet
 ```
 **3. Test with Real Prices**
 ```bash

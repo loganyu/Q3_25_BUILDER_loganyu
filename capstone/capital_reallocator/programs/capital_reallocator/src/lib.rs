@@ -8,6 +8,7 @@ pub mod state;
 pub mod errors;
 pub mod events;
 pub mod constants;
+pub mod protocols;
 
 use instructions::*;
 
@@ -53,6 +54,10 @@ pub mod capital_reallocator {
         ctx.accounts.resume()
     }
 
+    pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
+        ctx.accounts.close()
+    }
+
     // Rebalancing operations
     pub fn check_position_status(ctx: Context<CheckPositionStatus>) -> Result<()> {
         ctx.accounts.check_status()
@@ -61,23 +66,11 @@ pub mod capital_reallocator {
     pub fn rebalance_position(ctx: Context<RebalancePosition>) -> Result<()> {
         ctx.accounts.rebalance()
     }
-
-    pub fn rebalance_batch(
-        ctx: Context<RebalanceBatch>,
-        position_ids: Vec<u64>,
-    ) -> Result<()> {
-        ctx.accounts.rebalance_batch(position_ids)
-    }
-
     // Withdrawal operations
     pub fn withdraw_from_position(
         ctx: Context<WithdrawFromPosition>,
         withdraw_percentage: u8,
     ) -> Result<()> {
         ctx.accounts.withdraw(withdraw_percentage)
-    }
-
-    pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
-        ctx.accounts.close()
     }
 }

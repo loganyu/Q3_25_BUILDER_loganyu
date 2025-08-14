@@ -33,7 +33,3 @@ base64ct = "1.6.0"
 pyth-sdk-solana = "0.10.5"
 pyth-solana-receiver-sdk = "0.6.1"
 
-# Optional: External protocol CPI
-# meteora-dlmm = { git = "https://github.com/MeteoraAg/dlmm-sdk", optional = true }
-# kamino-lending = { git = "https://github.com/Kamino-Finance/kamino-lending", optional = true }
-# jupiter-cpi = { git = "https://github.com/jup-ag/jupiter-cpi", optional = true }

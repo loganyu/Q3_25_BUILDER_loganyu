@@ -65,12 +65,12 @@ async function initializeProtocol() {
     const protocolAccount = await program.account.protocolAuthority.fetch(protocolAuthority);
     console.log('✅ Protocol already initialized!');
     console.log('📋 Protocol Authority:', protocolAuthority.toString());
-    console.log('💰 Fee Recipient:', protocolAccount.fee_recipient.toString());
-    console.log('📊 Protocol Fee:', protocolAccount.protocol_fee_bps, 'bps');
-    console.log('🔢 Total Positions:', protocolAccount.total_positions.toString());
+    console.log('💰 Fee Recipient:', protocolAccount.feeRecipient.toString());
+    console.log('📊 Protocol Fee:', protocolAccount.protocolFeeBps, 'bps');
+    console.log('🔢 Total Positions:', protocolAccount.totalPositions.toString());
     
     // Still create fee recipient token accounts if they don't exist
-    await ensureFeeRecipientAccounts(program, user, state, protocolAccount.fee_recipient);
+    await ensureFeeRecipientAccounts(program, user, state, protocolAccount.feeRecipient);
     return;
   } catch (error) {
     console.log('🆕 Protocol not initialized, creating...');

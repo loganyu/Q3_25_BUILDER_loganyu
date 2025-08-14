@@ -5,7 +5,8 @@ import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   getAccount,
-  TOKEN_PROGRAM_ID
+  TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID
 } from "@solana/spl-token";
 import { loadState, loadUserKeypair } from './setup';
 import { writeFileSync, readFileSync } from 'fs';
@@ -35,16 +36,66 @@ async function fundDevnetAccounts() {
     return;
   }
   
-  // Use Circle's devnet USDC (the one from their faucet)
-  const usdcMint = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
-  const solMint = new PublicKey('So11111111111111111111111111111111111111112');
+  // Use the mints from state.json (set by setup.ts)
+  const usdcMint = new PublicKey(state.tokenAMint);
+  const solMint = new PublicKey(state.tokenBMint);
   
   console.log('🪙 USDC Mint:', usdcMint.toString());
   console.log('🪙 SOL Mint:', solMint.toString());
   
-  // Get associated token addresses
-  const userUsdcAccount = await getAssociatedTokenAddress(usdcMint, user.publicKey);
-  const userSolAccount = await getAssociatedTokenAddress(solMint, user.publicKey);
+  // Detect which token program each mint uses by checking the account owner
+  let usdcTokenProgram = TOKEN_PROGRAM_ID;
+  let solTokenProgram = TOKEN_PROGRAM_ID;
+  
+  // Check USDC mint account owner
+  const usdcMintInfo = await provider.connection.getAccountInfo(usdcMint);
+  if (!usdcMintInfo) {
+    console.error('❌ USDC mint not found on devnet:', usdcMint.toString());
+    console.log('   This might be the wrong address. Common devnet USDC addresses:');
+    console.log('   - 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU (devnet USDC)');
+    console.log('   - Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr (devnet USDC-Dev)');
+    throw new Error('USDC mint not found');
+  }
+  
+  if (usdcMintInfo.owner.equals(TOKEN_2022_PROGRAM_ID)) {
+    usdcTokenProgram = TOKEN_2022_PROGRAM_ID;
+    console.log('📦 USDC uses Token-2022 program');
+  } else if (usdcMintInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+    usdcTokenProgram = TOKEN_PROGRAM_ID;
+    console.log('📦 USDC uses standard Token program');
+  } else {
+    console.error('❌ USDC mint has unexpected owner:', usdcMintInfo.owner.toString());
+    throw new Error('Invalid USDC mint owner');
+  }
+  
+  // Check SOL mint account owner (wrapped SOL always uses standard token program)
+  const solMintInfo = await provider.connection.getAccountInfo(solMint);
+  if (!solMintInfo) {
+    throw new Error('Wrapped SOL mint not found');
+  }
+  
+  if (solMintInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+    solTokenProgram = TOKEN_PROGRAM_ID;
+    console.log('📦 Wrapped SOL uses standard Token program');
+  } else {
+    console.error('❌ SOL mint has unexpected owner:', solMintInfo.owner.toString());
+    throw new Error('Invalid SOL mint owner');
+  }
+  
+  // Get associated token addresses with the correct program
+  const userUsdcAccount = await getAssociatedTokenAddress(
+    usdcMint, 
+    user.publicKey,
+    false,
+    usdcTokenProgram
+  );
+  
+  const userSolAccount = await getAssociatedTokenAddress(
+    solMint, 
+    user.publicKey,
+    false,
+    solTokenProgram
+  );
   
   console.log('💼 User USDC account:', userUsdcAccount.toString());
   console.log('💼 User SOL account:', userSolAccount.toString());
@@ -53,8 +104,12 @@ async function fundDevnetAccounts() {
   const accountsToCreate = [];
   
   try {
-    await getAccount(provider.connection, userUsdcAccount);
+    await getAccount(provider.connection, userUsdcAccount, undefined, usdcTokenProgram);
     console.log('✅ USDC account already exists');
+    
+    // Get and display balance
+    const account = await getAccount(provider.connection, userUsdcAccount, undefined, usdcTokenProgram);
+    console.log('💰 USDC balance:', (Number(account.amount) / 1e6).toFixed(6));
   } catch {
     console.log('🏗️ USDC account needs to be created');
     accountsToCreate.push(
@@ -62,14 +117,19 @@ async function fundDevnetAccounts() {
         user.publicKey,
         userUsdcAccount,
         user.publicKey,
-        usdcMint
+        usdcMint,
+        usdcTokenProgram
       )
     );
   }
   
   try {
-    await getAccount(provider.connection, userSolAccount);
+    await getAccount(provider.connection, userSolAccount, undefined, solTokenProgram);
     console.log('✅ Wrapped SOL account already exists');
+    
+    // Get and display balance
+    const account = await getAccount(provider.connection, userSolAccount, undefined, solTokenProgram);
+    console.log('💰 Wrapped SOL balance:', (Number(account.amount) / 1e9).toFixed(9));
   } catch {
     console.log('🏗️ Wrapped SOL account needs to be created');
     accountsToCreate.push(
@@ -77,7 +137,8 @@ async function fundDevnetAccounts() {
         user.publicKey,
         userSolAccount,
         user.publicKey,
-        solMint
+        solMint,
+        solTokenProgram
       )
     );
   }
@@ -85,42 +146,50 @@ async function fundDevnetAccounts() {
   // Create accounts if needed
   if (accountsToCreate.length > 0) {
     const tx = new anchor.web3.Transaction().add(...accountsToCreate);
-    const signature = await provider.connection.sendTransaction(tx, [user]);
-    await provider.connection.confirmTransaction(signature);
-    console.log('✅ Created token accounts');
-    console.log('📝 Transaction:', signature);
+    
+    try {
+      const signature = await provider.connection.sendTransaction(tx, [user]);
+      await provider.connection.confirmTransaction(signature);
+      console.log('✅ Created token accounts');
+      console.log('📝 Transaction:', signature);
+    } catch (e) {
+      console.error('❌ Failed to create token accounts:', e);
+      if (e.logs) {
+        console.error('Transaction logs:', e.logs);
+      }
+      throw e;
+    }
   }
   
-  // Check balances
-  try {
-    const usdcBalance = await getAccount(provider.connection, userUsdcAccount);
-    console.log('💰 USDC balance:', (Number(usdcBalance.amount) / 1e6).toFixed(6));
-  } catch {
-    console.log('💰 USDC balance: 0 (account created but no tokens)');
-  }
-  
-  try {
-    const solBalance = await getAccount(provider.connection, userSolAccount);
-    console.log('💰 Wrapped SOL balance:', (Number(solBalance.amount) / 1e9).toFixed(9));
-  } catch {
-    console.log('💰 Wrapped SOL balance: 0');
-  }
-  
-  // Update state.json with correct devnet addresses
+  // Update state.json with correct account addresses (keep existing mints)
   const currentState = JSON.parse(readFileSync('./scripts/state.json', 'utf8'));
-  currentState.tokenAMint = usdcMint.toString();
-  currentState.tokenBMint = solMint.toString();
   currentState.userTokenA = userUsdcAccount.toString();
   currentState.userTokenB = userSolAccount.toString();
+  
+  // Store the token programs for future reference
+  currentState.tokenAProgramId = usdcTokenProgram.toString();
+  currentState.tokenBProgramId = solTokenProgram.toString();
   
   writeFileSync('./scripts/state.json', JSON.stringify(currentState, null, 2));
   console.log('💾 Updated state.json with devnet accounts');
   
   console.log('\n🎯 Next steps:');
-  console.log('1. Get USDC from: https://faucet.circle.com/');
+  console.log('1. Get devnet SOL from: https://faucet.solana.com/');
   console.log('   Your address:', user.publicKey.toString());
-  console.log('2. Wrap some SOL: spl-token wrap 0.1');
-  console.log('3. Then try: yarn deposit 10 0.001');
+  
+  // Check which USDC faucet to recommend based on the mint
+  if (usdcMint.toString() === '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU') {
+    console.log('2. Get devnet USDC from Solana Labs faucet or airdrop');
+    console.log('   Try: spl-token mint', usdcMint.toString(), '1000');
+  } else if (usdcMint.toString() === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr') {
+    console.log('2. Get USDC-Dev from Solana faucet');
+  } else {
+    console.log('2. Get USDC for mint:', usdcMint.toString());
+  }
+  
+  console.log('3. Wrap some SOL: spl-token wrap 0.1');
+  console.log('4. Then run: yarn init-protocol');
+  console.log('5. Then try: yarn deposit 10 0.001');
   
   console.log('\n✅ Devnet accounts ready!');
 }
