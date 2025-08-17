@@ -48,4 +48,7 @@ pub enum ErrorCode {
     
     #[msg("Lending position not found")]
     LendingPositionNotFound,
+
+    #[msg("Invalid account data")]
+    InvalidAccountData,
 }

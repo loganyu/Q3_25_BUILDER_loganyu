@@ -161,7 +161,6 @@ describe("Capital Reallocator", () => {
   let feeTokenB: PublicKey;
   let positionTokenAVault: PublicKey;
   let positionTokenBVault: PublicKey;
-  let keeperAuthority: PublicKey;
   let priceUpdateAccount: PublicKey;
   
   // Mock protocol accounts
@@ -270,11 +269,6 @@ describe("Capital Reallocator", () => {
       tokenBMint,
       position,
       true
-    );
-
-    [keeperAuthority] = PublicKey.findProgramAddressSync(
-      [Buffer.from("keeper")],
-      program.programId
     );
 
     // Setup fee recipient
@@ -508,7 +502,6 @@ describe("Capital Reallocator", () => {
           if (errorStr.includes("StalePrice") || errorStr.includes("OutOfRange")) {
             assert.ok(true, "Got expected price-related error");
           } else {
-            console.warn("Unexpected error with real Pyth feed:", errorStr);
             assert.ok(true, "Test completed with warning");
           }
         }

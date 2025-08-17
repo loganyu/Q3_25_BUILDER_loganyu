@@ -55,13 +55,3 @@ pub struct Position {
 
     pub bump: u8,
 }
-
-#[account]
-#[derive(InitSpace)]
-pub struct KeeperAuthority {
-    pub program_id: Pubkey,
-    pub authority: Pubkey,
-    pub is_active: bool,
-    pub total_rebalances_executed: u64,
-    pub bump: u8,
-}

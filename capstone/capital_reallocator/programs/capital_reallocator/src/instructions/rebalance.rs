@@ -24,16 +24,20 @@ pub struct CheckPositionStatus<'info> {
     )]
     pub position: Account<'info, Position>,
     
-    pub price_update: Account<'info, PriceUpdateV2>,
+    /// CHECK: Pyth price account - validated in instruction logic
+    pub price_update: UncheckedAccount<'info>,
 }
 
 impl<'info> CheckPositionStatus<'info> {
     pub fn check_status(&self) -> Result<()> {
+        let price_update = PriceUpdateV2::try_deserialize(
+            &mut &self.price_update.data.borrow()[..]
+        ).map_err(|_| ErrorCode::InvalidAccountData)?;
         // Get the price feed ID (using SOL/USD for SOL positions)
         let feed_id = get_feed_id_from_hex(SOL_USD_FEED_ID)?;
         // Get price with maximum age of 30 seconds
         let maximum_age: u64 = 30;
-        let price_data = self.price_update.get_price_no_older_than(
+        let price_data = price_update.get_price_no_older_than(
             &Clock::get()?,
             maximum_age,
             &feed_id
