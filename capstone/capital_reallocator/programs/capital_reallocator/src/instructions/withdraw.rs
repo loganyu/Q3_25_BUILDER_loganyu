@@ -124,7 +124,6 @@ impl<'info> WithdrawFromPosition<'info> {
         let net_withdraw_b = withdraw_b.checked_sub(fee_b).ok_or(ErrorCode::MathOverflow)?;
         
         // Update position state to reflect withdrawals from LP/lending
-        // This is a simplified version - in production you'd actually close these positions
         if withdraw_percentage == 100 {
             // For 100% withdrawal, clear everything
             self.position.token_a_in_lp = 0;

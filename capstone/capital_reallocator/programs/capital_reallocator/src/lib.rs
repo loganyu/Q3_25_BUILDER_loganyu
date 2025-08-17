@@ -66,6 +66,16 @@ pub mod capital_reallocator {
     pub fn rebalance_position(ctx: Context<RebalancePosition>) -> Result<()> {
         ctx.accounts.rebalance()
     }
+
+    // External protocol withdrawal operations
+    pub fn withdraw_from_meteora(ctx: Context<WithdrawFromMeteora>) -> Result<()> {
+        ctx.accounts.withdraw_from_lp()
+    }
+    
+    pub fn withdraw_from_kamino(ctx: Context<WithdrawFromKamino>) -> Result<()> {
+        ctx.accounts.withdraw_from_lending()
+    }
+
     // Withdrawal operations
     pub fn withdraw_from_position(
         ctx: Context<WithdrawFromPosition>,

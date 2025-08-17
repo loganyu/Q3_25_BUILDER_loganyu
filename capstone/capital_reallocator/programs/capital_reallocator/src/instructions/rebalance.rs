@@ -1,4 +1,4 @@
-// instructions/rebalance.rs (Fixed compilation errors)
+// instructions/rebalance.rs
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount, Mint};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, get_feed_id_from_hex};
@@ -14,7 +14,7 @@ pub const METEORA_DLMM_PROGRAM: &str = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaP
 // Real Kamino Lending Program ID  
 pub const KAMINO_LENDING_PROGRAM: &str = "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD";
 // Real Jupiter Aggregator Program ID
-pub const JUPITER_PROGRAM: &str = "JUPyTerVGraWPqKUN5g8STQTQbZvCEPfbZFpRFGHHHH";
+pub const JUPITER_PROGRAM: &str = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
 
 #[derive(Accounts)]
 pub struct CheckPositionStatus<'info> {
@@ -655,6 +655,229 @@ impl<'info> RebalancePosition<'info> {
             msg!("Would swap {} B for A using Jupiter", excess_b);
         }
         
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct WithdrawFromMeteora<'info> {
+    #[account(
+        mut,
+        seeds = [POSITION_SEED, owner.key().as_ref(), position.position_id.to_le_bytes().as_ref()],
+        bump = position.bump,
+        has_one = owner
+    )]
+    pub position: Account<'info, Position>,
+    
+    #[account(
+        mut,
+        constraint = position_token_a_vault.owner == position.key(),
+        constraint = position_token_a_vault.mint == position.token_a_mint
+    )]
+    pub position_token_a_vault: Box<Account<'info, TokenAccount>>,
+    
+    #[account(
+        mut,
+        constraint = position_token_b_vault.owner == position.key(),
+        constraint = position_token_b_vault.mint == position.token_b_mint
+    )]
+    pub position_token_b_vault: Box<Account<'info, TokenAccount>>,
+    
+    // Meteora accounts
+    /// CHECK: Meteora program
+    pub meteora_program: UncheckedAccount<'info>,
+    /// CHECK: Meteora LB pair
+    pub meteora_lb_pair: UncheckedAccount<'info>,
+    /// CHECK: Meteora position
+    #[account(mut)]
+    pub meteora_position: UncheckedAccount<'info>,
+    /// CHECK: Meteora reserves
+    #[account(mut)]
+    pub meteora_reserve_x: UncheckedAccount<'info>,
+    /// CHECK: Meteora reserves
+    #[account(mut)]
+    pub meteora_reserve_y: UncheckedAccount<'info>,
+    /// CHECK: Meteora bin arrays
+    #[account(mut)]
+    pub meteora_bin_array_lower: UncheckedAccount<'info>,
+    /// CHECK: Meteora event authority
+    #[account(mut)]
+    pub meteora_bin_array_upper: UncheckedAccount<'info>,
+    /// CHECK: Meteora event authority
+    pub meteora_event_authority: UncheckedAccount<'info>,
+    
+    pub token_a_mint: Account<'info, Mint>,
+    pub token_b_mint: Account<'info, Mint>,
+    pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+impl<'info> WithdrawFromMeteora<'info> {
+    pub fn withdraw_from_lp(&mut self) -> Result<()> {
+        let lp_a = self.position.token_a_in_lp;
+        let lp_b = self.position.token_b_in_lp;
+        
+        if lp_a == 0 && lp_b == 0 {
+            msg!("No funds in Meteora LP to withdraw");
+            return Ok(());
+        }
+        
+        msg!("Withdrawing {} A and {} B from Meteora LP", lp_a, lp_b);
+        
+        // Execute Meteora withdrawal
+        let position_account_info = self.position.to_account_info();
+        self.position.close_meteora_position_cpi(
+            &position_account_info,
+            &self.meteora_program,
+            &self.meteora_lb_pair,
+            &self.meteora_position,
+            &self.position_token_a_vault,
+            &self.position_token_b_vault,
+            &self.meteora_reserve_x,
+            &self.meteora_reserve_y,
+            &self.token_a_mint,
+            &self.token_b_mint,
+            &self.meteora_bin_array_lower,
+            &self.meteora_bin_array_upper,
+            &self.token_program,
+            &self.meteora_event_authority,
+        )?;
+        
+        // Update position state
+        let withdrawn_a = self.position.token_a_in_lp;
+        let withdrawn_b = self.position.token_b_in_lp;
+        
+        self.position.token_a_in_lp = 0;
+        self.position.token_b_in_lp = 0;
+        self.position.token_a_vault_balance = self.position.token_a_vault_balance
+            .checked_add(withdrawn_a)
+            .ok_or(ErrorCode::MathOverflow)?;
+        self.position.token_b_vault_balance = self.position.token_b_vault_balance
+            .checked_add(withdrawn_b)
+            .ok_or(ErrorCode::MathOverflow)?;
+        
+        self.position.meteora_position = None;
+        
+        msg!("Successfully withdrew {} A and {} B from Meteora", withdrawn_a, withdrawn_b);
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct WithdrawFromKamino<'info> {
+    #[account(
+        mut,
+        seeds = [POSITION_SEED, owner.key().as_ref(), position.position_id.to_le_bytes().as_ref()],
+        bump = position.bump,
+        has_one = owner
+    )]
+    pub position: Account<'info, Position>,
+    
+    #[account(
+        mut,
+        constraint = position_token_a_vault.owner == position.key(),
+        constraint = position_token_a_vault.mint == position.token_a_mint
+    )]
+    pub position_token_a_vault: Box<Account<'info, TokenAccount>>,
+    
+    #[account(
+        mut,
+        constraint = position_token_b_vault.owner == position.key(),
+        constraint = position_token_b_vault.mint == position.token_b_mint
+    )]
+    pub position_token_b_vault: Box<Account<'info, TokenAccount>>,
+    
+    // Kamino accounts
+    /// CHECK: Kamino program
+    pub kamino_program: UncheckedAccount<'info>,
+    /// CHECK: Kamino lending market
+    pub kamino_lending_market: UncheckedAccount<'info>,
+    /// CHECK: Kamino obligation
+    #[account(mut)]
+    pub kamino_obligation: UncheckedAccount<'info>,
+    /// CHECK: Kamino reserves
+    #[account(mut)]
+    pub kamino_reserve_a: UncheckedAccount<'info>,
+    /// CHECK: Kamino reserves
+    #[account(mut)]
+    pub kamino_reserve_b: UncheckedAccount<'info>,
+    
+    pub owner: Signer<'info>,
+    pub clock: Sysvar<'info, Clock>,
+    pub token_program: Program<'info, Token>,
+}
+
+impl<'info> WithdrawFromKamino<'info> {
+    pub fn withdraw_from_lending(&mut self) -> Result<()> {
+        let lending_a = self.position.token_a_in_lending;
+        let lending_b = self.position.token_b_in_lending;
+        
+        if lending_a == 0 && lending_b == 0 {
+            msg!("No funds in Kamino lending to withdraw");
+            return Ok(());
+        }
+        
+        msg!("Withdrawing {} A and {} B from Kamino lending", lending_a, lending_b);
+        
+        let position_account_info = self.position.to_account_info();
+        
+        // Withdraw token A from Kamino
+        if lending_a > 0 {
+            let source_collateral_a = self.kamino_reserve_a.to_account_info();
+            
+            self.position.withdraw_from_kamino_cpi(
+                &position_account_info,
+                &self.kamino_program.to_account_info(),
+                &source_collateral_a,
+                &self.position_token_a_vault,
+                &self.kamino_reserve_a,
+                &self.kamino_reserve_a, // Reserve liquidity supply
+                &self.kamino_reserve_a, // Reserve collateral mint
+                &self.kamino_lending_market,
+                &self.kamino_lending_market, // Market authority (derived)
+                &self.kamino_obligation,
+                &position_account_info,
+                &self.clock,
+                &self.token_program,
+                lending_a,
+            )?;
+            
+            self.position.token_a_in_lending = 0;
+            self.position.token_a_vault_balance = self.position.token_a_vault_balance
+                .checked_add(lending_a)
+                .ok_or(ErrorCode::MathOverflow)?;
+        }
+        
+        // Withdraw token B from Kamino
+        if lending_b > 0 {
+            let source_collateral_b = self.kamino_reserve_b.to_account_info();
+            
+            self.position.withdraw_from_kamino_cpi(
+                &position_account_info,
+                &self.kamino_program.to_account_info(),
+                &source_collateral_b,
+                &self.position_token_b_vault,
+                &self.kamino_reserve_b,
+                &self.kamino_reserve_b, // Reserve liquidity supply
+                &self.kamino_reserve_b, // Reserve collateral mint
+                &self.kamino_lending_market,
+                &self.kamino_lending_market, // Market authority (derived)
+                &self.kamino_obligation,
+                &position_account_info,
+                &self.clock,
+                &self.token_program,
+                lending_b,
+            )?;
+            
+            self.position.token_b_in_lending = 0;
+            self.position.token_b_vault_balance = self.position.token_b_vault_balance
+                .checked_add(lending_b)
+                .ok_or(ErrorCode::MathOverflow)?;
+        }
+        
+        self.position.kamino_obligation = None;
+        
+        msg!("Successfully withdrew {} A and {} B from Kamino", lending_a, lending_b);
         Ok(())
     }
 }

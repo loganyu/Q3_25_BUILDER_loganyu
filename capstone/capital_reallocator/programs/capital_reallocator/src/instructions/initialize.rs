@@ -1,6 +1,6 @@
 // instructions/initialize.rs
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, TokenAccount, Mint};
+use anchor_spl::token::{Token, TokenAccount, Mint, Transfer};
 use anchor_spl::associated_token::AssociatedToken;
 use crate::state::*;
 use crate::errors::ErrorCode;

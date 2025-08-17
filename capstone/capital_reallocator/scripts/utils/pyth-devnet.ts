@@ -23,7 +23,7 @@ const DEVNET_FEEDS = {
 // Real program IDs for external protocols
 const METEORA_DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
 const KAMINO_LENDING_PROGRAM = new PublicKey("KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD");
-const JUPITER_PROGRAM = new PublicKey("JUPyTerVGraWPqKUN5g8STQTQbZvCEPfbZFpRFGHHHH");
+const JUPITER_PROGRAM = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
 
 export class PythDevnet {
   private hermesClient: HermesClient;

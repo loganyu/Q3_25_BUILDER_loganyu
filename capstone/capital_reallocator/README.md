@@ -4,9 +4,38 @@
 
 A Solana program that automatically rebalances capital between liquidity provision (Meteora DLMM) and lending (Kamino) based on real-time price data from Pyth Network.
 
-## 🛠️ Installation
+## 🏗️ Architecture
 
-## 🌐 Environment Setup
+### Core Components
+- **ProtocolAuthority**: Global protocol configuration
+- **UserMainAccount**: User's position registry  
+- **Position**: Individual strategy position
+- **Token Vaults**: Associated token accounts for idle funds
+
+### Rebalancing Logic
+1. **Price In Range** → Move to Meteora LP
+2. **Price Out of Range** → Move to Kamino Lending
+3. **Idle Funds** → Deploy based on current price
+
+### External Integrations
+- **Meteora DLMM**: `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo`
+- **Kamino Lending**: `KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD`
+- **Jupiter Aggregator**: `JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4`
+- **Pyth Network**: Real-time price feeds with confidence intervals
+
+## Unit Testing
+
+### Local Development
+`yarn test`
+
+### Devnet Testing
+Note: Meteora DLMM pools and Kamino lending markets for arbitrary token pairs don't exist on devnet, so mock accounts are used to verify our rebalancing logic works correctly.
+
+`yarn test:devnet`
+
+
+## Testing Scripts Setup
+Testing scripts can be used for interactive testing. A position can be opened, closed, and deposits can be made in the command line. Note that rebalance is not possible because of limitations with Meteora and Kamino on devnet.
 
 ### Local Development
 ```bash
@@ -136,37 +165,3 @@ yarn pyth-devnet monitor 60    # Monitor for 60 seconds
 | `yarn close-accounts:confirm` | Execute cleanup |
 | `yarn clean` | Clean state and build files |
 
-## 🏗️ Architecture
-
-### Core Components
-- **ProtocolAuthority**: Global protocol configuration
-- **UserMainAccount**: User's position registry  
-- **Position**: Individual strategy position
-- **Token Vaults**: Associated token accounts for idle funds
-
-### Rebalancing Logic
-1. **Price In Range** → Move to Meteora LP
-2. **Price Out of Range** → Move to Kamino Lending
-3. **Idle Funds** → Deploy based on current price
-
-### External Integrations
-- **Meteora DLMM**: `LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo`
-- **Kamino Lending**: `KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD`
-- **Jupiter Aggregator**: `JUPyTerVGraWPqKUN5g8STQTQbZvCEPfbZFpRFGHHHH`
-- **Pyth Network**: Real-time price feeds with confidence intervals
-
-## 🧪 Testing
-
-### Local Testing
-```bash
-yarn build
-yarn deploy
-yarn test
-```
-
-### Devnet Testing
-```bash
-yarn deploy:devnet
-yarn setup
-yarn pyth-devnet check
-```
