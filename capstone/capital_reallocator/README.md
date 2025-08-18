@@ -4,6 +4,8 @@
 
 A Solana program that automatically rebalances capital between liquidity provision (Meteora DLMM) and lending (Kamino) based on real-time price data from Pyth Network.
 
+[Video Pitch Presentation](https://youtu.be/hFeBYYPE_aE) - https://youtu.be/hFeBYYPE_aE
+
 ## 🏗️ Architecture
 
 ### Core Components
@@ -78,7 +80,7 @@ yarn init-user       # Initialize user account
 
 **4. Create and Fund Position**
 ```bash
-yarn create-position    # Create position with $100-$200 range
+yarn create-position    # Create position with $150-$160 range
 yarn deposit 1 0.1      # Deposit 100 Token A, 1 Token B
 yarn balances          # Check all balances
 ```
