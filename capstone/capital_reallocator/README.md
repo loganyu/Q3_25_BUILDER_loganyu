@@ -4,7 +4,7 @@
 
 A Solana program that automatically rebalances capital between liquidity provision (Meteora DLMM) and lending (Kamino) based on real-time price data from Pyth Network.
 
-[Video Pitch Presentation](https://youtu.be/hFeBYYPE_aE) - https://youtu.be/hFeBYYPE_aE
+[Video Pitch Presentation](https://youtu.be/H70L4GCH97U) - https://youtu.be/H70L4GCH97U
 
 ## 🏗️ Architecture
 
